@@ -5,10 +5,12 @@
 # Programmed by	 ->	Randy Oyarzabal (techno) 
 #			Richard Griswold
 #
+# Documentation  ->     Nate Steffenhagen
+#
 # Contact e-mail ->	reoback at penguinsoup.org
 #
 # Creation Date	 ->	April 02, 2001
-# Last Modified  ->	July 21, 2001
+# Last Modified  ->	August 8, 2001
 #
 # Description 	 ->	A simple remote/local backup program that uses tar 
 #			and gzip to compress archives and transfer via FTP
@@ -21,6 +23,7 @@ use Net::FTP;
 # SET CONSTANTS
 ############################################################################
 
+my $VERSION	= "1.0 RC2";
 my $DATESTAMP   = `date +%Y%m%d`;  #Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`;#Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;  #Current time in format: 0945PM
@@ -32,13 +35,9 @@ my $EXT         = "\.tgz";
 ###########################################################################
 my %config;
 
-# Location of this script
-my $sDir = "/usr/reoback/";
-
-my $fstat = $sDir."status.dat";		# Counter and last full backup time.
-my $archFiles = $sDir."archives.dat";	# Used for auto deletions.
+my $fstat;				# Counter and last full backup time.
+my $archFiles;				# Used for auto deletions.
 my $startTime = time();			# Current time in seconds.
-my $cfgFile = shift;			# Program configuration file.
 my $endTime;    # Time progam completed in seconds.
 my $xferTime=0;	# Time it took to transfer files.
 my $lastFull;   # Last full backup in seconds.
@@ -47,11 +46,8 @@ my $bCounter;   # Backup counter.
 my $localPath;	# Local path for archives.
 my $remotePath;	# Remote path for archives.
 my $nfsPath;	# NFS path for archives.
-my $tmpFlg = 0;	# Temporary flag set when backupMisc is invoked.
 my $ftp;        # Object for FTP connection.
-
-# Parse configuration and load variables to the hash table
-&parseConfig;
+my @skipDirs;	# Global for directories to skip per archive.
 
 # Determine what type of backup to perform
 &backupType;
@@ -85,10 +81,9 @@ if ($config{"remotebackup"}){
 
 # Start backup process
 print "Archiving in progress...\n\n";
-&backupPGSQL();
-&backupDir($config{"mysqldbs"}, "MySQL", 0);
-&backupDir($config{"sites"}, "Sites",    1);
-&backupMisc();
+# &backupDir($config{"mysqldbs"}, "MySQL", 0);
+# &backupDir($config{"sites"}, "Sites",    1);
+&processFiles();
 
 &processDeletions();
 
@@ -120,22 +115,6 @@ print "Overall backup time: ".timeCalc($endTime)."\.\n\n";
 exit;
 
 # END MAIN #############################
-
-# Description: Routine for backing up pgSQL data.
-# Parameter(s): none.
-sub backupPGSQL{
-   my $pgDump;          # pgSQL dump.
-   my $pgsqlFile;       # Tarred pgSQL dump.
-   $pgDump = $localPath."pgSQLDump.sql";
-   print "  Working on PostgreSQL...\n";
-   rename($config{"pgcrypt"},$config{"pgtmp"});
-   rename($config{"pgtrust"},$config{"pgcrypt"});
-   system("pg_dumpall > ".$pgDump);
-   rename($config{"pgcrypt"},$config{"pgtrust"});
-   rename($config{"pgtmp"},$config{"pgcrypt"});
-   &backupFile($pgDump, "PGSQL");
-   unlink ($pgDump);
-}
 
 # Description:  Routine for directory backups.  Given a directory, a
 #               tar file is created for it and transferred if necessary.
@@ -324,6 +303,8 @@ sub scanDir{
   my $lastmod;          # Last modified date
   my $top;              # Non-zero if top of recursive calls
   my $count = 0;
+  my $skipDir;
+  my $skipFlag = 0;
 
   if ( not $fileName ) {
     $fileName = $bname;
@@ -338,13 +319,17 @@ sub scanDir{
         and ( -d $curdir."/".$name )                # Is this a directory?
         and ( not -l $curdir."/".$name ) ) {        # And not a symlink?
 
-      # Skip /home/sites because we are handling that separately.
-      if ( !$tmpFlg or 
-            ($curdir."/".$name ne $config{"sites"}) and 
-            ($curdir."/".$name ne "/home/tmp") and 
-	    ($curdir."/".$name ne "/home/bu1") ){
+      # Loop through global array of directories to skip.
+      foreach $skipDir (@skipDirs) {
+         if ($curdir."/".$name eq $skipDir) {
+            $skipFlag = 1;
+         }
+      }
+      if ( !$skipFlag ){
         push @dirs, $name;
       }
+      # Re-initialize skip flag.
+      $skipFlag = 0;
     } elsif ( ( -f $curdir."/".$name ) or ( -l $curdir."/".$name ) ) {
       # File processing here...
       &addToFile( $curdir."/".$name, $fileName, $btype, $fileList );
@@ -380,8 +365,33 @@ sub scanDir{
 # Parameter(s): none.
 sub parseConfig
 {
+    my $cfgFile;
+    my $argNum = @ARGV;
+    if ( ($argNum == 0 ) || ( $argNum > 1 ) ) {
+       &usage;
+       exit;
+    }
+    if ($argNum == 1) {
+       my $arg = $ARGV[0];
+       if ($arg =~ /^-h$|^--help$|^--usage$/) {
+          &usage;
+          exit;
+       }
+       elsif ($arg =~ /^-v$|^--version$/) {
+          &version;
+          exit;
+       }
+       elsif (-f $arg) {
+          $cfgFile = $arg;
+       }
+       else {
+          &usage;
+          exit;
+       }
+    }
+
     my ($var, $val);
-    if(!$cfgFile) { $cfgFile = $sDir."settings.cfg"; }
+#    if(!$cfgFile) { $cfgFile = $sDir."settings.cfg"; }
     open(CONF, "<$cfgFile") || die "Cannot find config file: $!\n";
     while (<CONF>) {
         chomp;                      # no newline
@@ -400,6 +410,12 @@ sub parseConfig
 # Parameter(s): none.
 sub backupType
 {
+    # Parse configuration and load variables to the hash table
+    &parseConfig;
+
+    $fstat = $config{"datadir"}."status.dat";
+    $archFiles = $config{"datadir"}."archives.dat";
+
     my $backupDays;     # Number of days to keep backups.
     my @bstatus;        # Array containing counter and last full backup time.
         # Key:
@@ -428,15 +444,15 @@ sub backupType
       $bCounter = $bstatus[0] + 1;
       $lastFull = $bstatus[1];
 
-      #For EXAMPLE backupDays = 7
+      # For EXAMPLE backupDays = 7
       ####################################################################
-      #1 = FULL         8  = FULL
-      #2 = INCREMENTAL  9  = INCREMENTAL
-      #3 = INCREMENTAL  10 = INCREMENTAL
-      #4 = INCREMENTAL  11 = INCREMENTAL
-      #5 = INCREMENTAL  12 = INCREMENTAL
-      #6 = INCREMENTAL  13 = INCREMENTAL
-      #7 = INCREMENTAL  14 = INCREMENTAL
+      # 1 = FULL 			8  = FULL
+      # 2 = INCREMENTAL  		9  = INCREMENTAL
+      # 3 = INCREMENTAL  		10 = INCREMENTAL
+      # 4 = INCREMENTAL  		11 = INCREMENTAL
+      # 5 = INCREMENTAL  		12 = INCREMENTAL
+      # 6 = INCREMENTAL  		13 = INCREMENTAL
+      # 7 = INCREMENTAL (DELETE 8-14)  	14 = INCREMENTAL (DELETE 1-7)
       ####################################################################
       if ( ( $bCounter - 1 ) % $backupDays ) {
         $backupType = "incremental";
@@ -462,6 +478,83 @@ sub backupType
     print qq/Last full backup: $lTime\n\n/;
 }
 
+sub processFiles {
+  my $tmpExt = ".tmp";
+  my $tmpStr;
+  my $tmpFile;
+  my $realStr;
+  my $archFile;
+  my $skipFile;
+  my $skipLine;
+  my @skipItems;
+  my @archFiles;
+  my $misc = $config{"files"};
+
+  open FILE, "<$misc" or
+     die "Cannot open \"$misc\": $!\n";
+
+  foreach ( <FILE> ) {
+     if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
+        chop $_;                                      # Remove trailing newline
+
+        if (/^file:/i) {
+           # Close previously opened file if any.
+           if ( fileno ARCHFILE ) {
+              close ARCHFILE;
+           }
+           if ( fileno SKIPFILE ) {
+              close SKIPFILE;
+           }
+           $tmpFile = $'; # Grab right end of the match.
+           $tmpFile =~ s/\s+//g;
+           $archFile = $config{"tmpdir"} . $tmpFile . $tmpExt;
+           $skipFile = $config{"tmpdir"} . $tmpFile . "_SKIP" . $tmpExt;
+           push @archFiles, $tmpFile;
+           open ARCHFILE, ">$archFile" or
+              die "open \"$archFile\": $!\n";
+        }
+        elsif (/^skip:/i) {
+           $skipLine = $'; # Grab right end of the match.
+           $skipLine =~ s/\s+//g;
+           @skipItems = split (",",$skipLine);
+           if ( not fileno SKIPFILE ) {
+              open SKIPFILE, ">$skipFile" or
+                 die "open \"$skipFile\": $!\n";
+           }
+           foreach (@skipItems){
+              print SKIPFILE "$_\n";
+           }
+        }
+        else {
+           print ARCHFILE "$_\n";
+        }
+     }         
+  }
+  if ( fileno SKIPFILE ) {
+     close SKIPFILE;
+  }
+  if ( fileno ARCHFILE ) {
+     close ARCHFILE;
+  }
+
+  foreach (@archFiles) {
+     my $fullSkipFile = $config{"tmpdir"}.$_."_SKIP".$tmpExt;
+     my $fullArchFile = $config{"tmpdir"}.$_.$tmpExt;
+     if ( -e $fullSkipFile ){
+        open (SKIPDIRS, "<$fullSkipFile");
+        @skipDirs = <SKIPDIRS>; 
+        chomp(@skipDirs);
+        # Remove temporary file
+        unlink ( $fullSkipFile );
+     }    
+     backupMisc($_, $fullArchFile);
+
+     # Remove temporary file
+     unlink ( $fullArchFile );
+  }
+
+}
+
 # Description:  Routine to back up files in files.cfg
 # Parameter(s): none.
 sub backupMisc {
@@ -471,12 +564,8 @@ sub backupMisc {
   my $btype;
   my $lastmod;
   my $fullPath;
-  my $bName = "Misc";
-  my $misc = $config{"misc"};
-
-  # Set flag once we start this subroutine.  This is so that /home/sites
-  # is excluded from scanDir since it is a special case.
-  $tmpFlg = 1;
+  my $bName = $_[0];
+  my $misc = $_[1];
 
   print "  Working on $bName...\n";
 
@@ -484,7 +573,7 @@ sub backupMisc {
      die "Cannot open \"$misc\": $!\n";
 
   $btype = $backupType eq "incremental" ? 1 : 0;
-  $fileName = $sDir."files.cfg.misc";
+  $fileName = $config{"tmpdir"}.$bName."list";
 
   foreach ( <FILE> ) {
     if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
@@ -623,7 +712,7 @@ sub processDeletions{
    my $file;
    my $ldir;
    my $rdir;
-   my $tmpFile = $sDir."archives.tmp";
+   my $tmpFile = $config{"tmpdir"}."archives.tmp";
    my ($upper, $lower, $buNum);
 
    $backupDays = $config{"backupdays"};
@@ -713,12 +802,45 @@ sub processDeletions{
    }
 }
 
+sub version {
+  print "REOBack version $VERSION; distributed under the GNU GPL.\n";
+}
+
+sub usage {
+  print << "END_OF_INFO";
+
+REOBack Simple Backup Solution ver. $VERSION 
+(c) 2001, Randy E. Oyarzabal (techno91\@users.sourceforge.net)
+
+Usage: reoback.pl [options] [<configfile>]
+
+Options:
+-v, --version		Display version information.
+-h, --help, --usage	Display this help information.
+
+See http://sourceforge.net/projects/reoback/ for project info.
+
+END_OF_INFO
+}
+
+
 ###############################################################################
 # $Id$
 ###############################################################################
 #
 # $Log$
+# Revision 1.5  2001/08/17 21:42:13  techno91
+# - Configuration file is now passed as a parameter to reoback.pl.  This way
+#   it can be used dynamically by many users on one system.
+#
+# - Added functionality to define individual archives by defining them
+#   in a central location. i.e. files.cfg.  See documentation on formatting.
+#
+# - Depreciated support for individual MySQL and PostGreSQL backups.  All
+#   backups are now defined in a user supplied file like "files.cfg".
+#
 # Revision 1.4  2001/08/08 21:48:30  techno91
 # Initial load into CVS.
 #
 #
+
