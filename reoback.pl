@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -W
 ############################################################################
 # REOBack - reoback.pl
 # $Id$
@@ -7,10 +7,10 @@
 # REOBack Simple Backup Solution
 # http://sourceforge.net/projects/reoback/
 #
-# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91@users.sourceforge.net)
 #
 # Other developers and contributors:
-#    Richard Griswold
+#    Richard Griswold  (griswold@users.sourceforge.net)
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
 #
 # This program is free software; you can redistribute it and/or modify
@@ -38,328 +38,256 @@ use strict;
 # SET CONSTANTS
 ###########################################################################
 
-my $VERSION	= "1.0 Release 2";
-my $DATESTAMP   = `date +%Y%m%d`;  #Current date in format: 04092001
-my $DATESTAMPD  = `date +%Y-%m-%d`;#Current date in format: 04092001
-my $TIMESTAMP   = `date +%I%M%p`;  #Current time in format: 0945PM
-my $TARCMD      = "tar cpfz";
-my $NFSCMD	= "mount -o rw,soft,intr,wsize=8192,rsize=8192";
-my $EXT         = "\.tgz";
+my $VERSION     = "1.0 Release 4";  # REOBack version number
+my $DATESTAMP   = `date +%Y%m%d`;   # Current date in format: 04092001
+my $DATESTAMPD  = `date +%Y-%m-%d`; # Current date in format: 04092001
+my $TIMESTAMP   = `date +%I%M%p`;   # Current time in format: 0945PM
+my $TARCMD      = "tar cpfz";       # Command to use to create tar files
+my $NFSCMD      = "mount -o rw,soft,intr,wsize=8192,rsize=8192";
+my $EXT         = "\.tgz";          # Tar file extension
 
 # GLOBAL VARIABLES
 ###########################################################################
-my %config;
+my %config;             # Hash containing REOBack configuration data.
+my $fstat;              # Counter and last full backup time.
+my $archFiles;          # Used for auto deletions.
+my $startTime = time(); # Current time in seconds.
+my $endTime;            # Time progam completed in seconds.
+my $xferTime = 0;       # Time it took to transfer files.
+my $lastFull;           # Last full backup in seconds.
+my $backupType;         # Type of backup, "full" or "incremental".
+my $bCounter;           # Backup counter.
+my $localPath;          # Local path for archives.
+my $remotePath;         # Remote path for archives.
+my $nfsPath;            # NFS path for archives.
 
-my $fstat;				# Counter and last full backup time.
-my $archFiles;				# Used for auto deletions.
-my $startTime = time();			# Current time in seconds.
-my $endTime;    # Time progam completed in seconds.
-my $xferTime=0;	# Time it took to transfer files.
-my $lastFull;   # Last full backup in seconds.
-my $backupType; # Type of backup, "full" or "incremental".
-my $bCounter;   # Backup counter.
-my $localPath;	# Local path for archives.
-my $remotePath;	# Remote path for archives.
-my $nfsPath;	# NFS path for archives.
-my $ftp;        # Object for FTP connection.
-my @skipDirs;	# Global for directories to skip per archive.
-my $foundFiles; # Global for determining if files are found for backup.
-
+# Parse configuration and load variables to the hash table
 # Determine what type of backup to perform
-&backupType;
+&parseConfig();
+&backupType();
 
-$localPath = $config{"localbackup"}.$DATESTAMPD."\/";
-$remotePath = $config{"remotepath"}.$DATESTAMPD."\/";
-$nfsPath = $config{"localmount"}.$DATESTAMPD."\/";
-
-# Create local archive location if needed.
-if (!-e $localPath){
-   mkdir ($localPath, 0700);
+# Make sure that dirs exist (localmount and localbackup are checked below)
+if ( not -e $config{"tmpdir"} ) {
+  &mkdirp( $config{"tmpdir"}, 0700 ) or
+    die "Unable to create 'tmpdir' directory '$config{'tmpdir'}': $!\n";
+}
+if ( not -e $config{"datadir"} ) {
+  &mkdirp( $config{"datadir"}, 0700 ) or
+    die "Unable to create 'datadir' directory '$config{'datadir'}': $!\n";
 }
 
-# Mount NFS volume if necessary.
-if ($config{"remotebackup"}){
-   if ($config{"rbackuptype"} eq "NFS"){
-      print "Mounting NFS volume in progress...";
-      use File::Copy;  # We only need this if NFS backups are performed.
-      my $tmpCMD = $NFSCMD." ".$config{"remotehost"}.":".$config{"remotepath"}." ".$config{"localmount"};
-      if (system ($tmpCMD)) {
-         print "Failed!\n\n";
-         die ("Aborting backups...\n");
-      }
-      # Create NFS archive location if needed.
-      if (!-e $nfsPath){
-         mkdir ($nfsPath, 0700);
-      }
-      print "done.\n\n";
-   }
-   else {
-     use Net::FTP;
-   }
+# Setup paths to archives
+$localPath  = $config{"localbackup"}."/".$DATESTAMPD."/";
+$remotePath = $config{"remotepath"}."/".$DATESTAMPD."/";
+$nfsPath    = $config{"localmount"}."/".$DATESTAMPD."/";
+
+# Remove extra slashes in paths
+$localPath  =~ s/\/+/\//g;
+$remotePath =~ s/\/+/\//g;
+$nfsPath    =~ s/\/+/\//g;
+
+# Create local archive location if needed.
+if ( !-e $localPath ) {
+  &mkdirp( $localPath, 0700 ) or
+    die "Unable to create directory for archives '$localPath': $!\n";
+}
+
+# Check for remote backup
+if ( $config{"remotebackup"} ) {
+  # Mount NFS volume if necessary.
+  if ( $config{"rbackuptype"} eq "NFS" ) {
+    print "Mounting NFS volume in progress...";
+
+    use File::Copy;  # We only need this if NFS backups are performed.
+    my $tmpCMD = $NFSCMD." ".$config{"remotehost"}.":".
+       $config{"remotepath"}." ".$config{"localmount"};
+
+    if ( system ( $tmpCMD ) ) {
+      die ( "NFS mount command failed!\n\nAborting backups...\n" );
+    }
+    # Create NFS archive location if needed.
+    if ( !-e $nfsPath ) {
+      &mkdirp( $nfsPath, 0700 ) or
+    die "Unable to create directory for NFS backup '$nfsPath': $!\n";
+    }
+    print "done.\n\n";
+  }
+
+  # Prepare for FTP transfer
+  elsif ( $config{"rbackuptype"} eq "FTP" ) {
+    if ( findModule( "Net/FTP.pm" ) ) {
+      require Net::FTP;
+      Net::FTP->import();
+    } else {
+      die "You must install the Net::FTP to perform a remote backup via FTP\n";
+    }
+  }
+
+  # Invalid remote backup type
+  else {
+    print "Invalid remote backup type $config{'rbackuptype'}.  Ignoring.\n";
+  }
 }
 
 # Start backup process
 print "Archiving in progress...\n\n";
-# &backupDir($config{"mysqldbs"}, "MySQL", 0);
 &processFiles();
-# &backupDir("/home/sforge/reoback", "Reoback",    1);
 
+# Delete old backups that are no longer need
 &processDeletions();
 
 # Close NFS volume if necessary
-if ($config{"remotebackup"}){
-   if ($config{"rbackuptype"} eq "NFS"){
-      system ("umount ".$config{"localmount"});
-   }
+if ( $config{"remotebackup"} ) {
+  if ( $config{"rbackuptype"} eq "NFS" ) {
+    system ( "umount ".$config{"localmount"} );
+  }
 }
 
 # Record new status values
-open (FILESTATUS, ">$fstat");
+open  FILESTATUS, ">$fstat";
 print FILESTATUS $bCounter . "," . $lastFull;
 close FILESTATUS;
 
-if ($config{"keeplocalcopy"}){
-   print "All local archives were saved in $localPath\n";
+if ( $config{"keeplocalcopy"} ) {
+  print "All local archives were saved in $localPath\n";
 }
 else {
-   rmdir ($localPath) or
-      print "  Unable to remove local directory: ".$!."!\n\n";
-   print "All local archives were removed.\n";
+  rmdir ( $localPath ) or
+    print "  Unable to remove local directory: ".$!."!\n\n";
+  print "All local archives were removed.\n";
 }
 
 $endTime = time() - $startTime;
 
-print "Total transfer time: ".timeCalc($xferTime)."\.\n";
-print "Overall backup time: ".timeCalc($endTime)."\.\n\n";
+print "Total transfer time: ".timeCalc( $xferTime )."\.\n";
+print "Overall backup time: ".timeCalc( $endTime )."\.\n\n";
 exit;
 
 # END MAIN #############################
 
-# Description:  Routine for directory backups.  Given a directory, a
-#               tar file is created for it and transferred if necessary.
-# Parameter(s): "directory to backup", "name to call this backup",
-#               "create separate archives for subdirectories if non-zero"
-sub backupDir{
-   my $fileName; # File name of backup to make.
-   my $bDir     = $_[0];   # Directory to backup.
-   my $bName    = $_[1];   # Name to call this backup.
-   my $subdirs  = $_[2];   # Create separate archives for subdirs if non-zero
-   my @fileList;           # List of text file that contain files to backup.
-   my $fullPath;	   # Full file path of archive.
+# Description:  Routine for checking if a module is installed
+# Parameter(s): "Module to check for"
+# Returns:      Non-zero if module is found
+sub findModule {
+  my $moduleName = $_[0];
 
-   print "  Working on $bName...\n";
-
-   # Scan directory for all files for backup depending on type of backup.
-   @fileList = &preBackupDir ($bDir, $bName, $subdirs);
-
-   # Back up only if there are files that need to be backed up
-   if ( !@fileList ){
-      print "    No new or changed files since last full backup for ".
-         $bName.".\n\n";
-   }
-   else {
-      foreach ( @fileList ) {
-        $fileName = $config{"host"}."-".$_."-".$backupType."-".
-            $DATESTAMP."-".$TIMESTAMP."\.".$bCounter.$EXT;
-
-        $fullPath = $localPath.$fileName;
-
-        # Tar backup files
-        print "    Archiving ".$_."...\n";
-        &archiveFile($fullPath, 1, $config{"tmpdir"}.$_, $fileName);
-
-        # Transfer if needed.
-        if ($config{"remotebackup"}){
-          transferFile($fullPath, $fileName);
-        }
-
-        # Delete if needed.
-        if (!$config{"keeplocalcopy"}){
-          unlink ($fullPath);
-        }
-
-        # Remove temporary file
-        unlink ($_);
-      }
-   }
-}
-
-# Description:  Routine for file backups.  Given a file, a
-#               tar file is created for it and transferred if necessary.
-# Parameter(s): "file to backup", "name to call this backup"
-sub backupFile{
-   my $lastmod;         # File's last modified time
-   my $fileName;        # File name to call backup.
-   my $file = $_[0];    # File to backup.
-   my $bName = $_[1];   # Name of backup.
-   my $fullPath;	# Full path of archive.
-
-   $fileName = $config{"host"}."-".$bName."-".$backupType."-".
-       $DATESTAMP."-".$TIMESTAMP."\.".$bCounter.$EXT;
-
-   $fullPath = $localPath.$fileName;
-
-   # Only backup file if it is new or changed
-   $lastmod = ( stat( $file ) )[10];
-   if ( $lastmod > $lastFull ){
-      # Tar backup files
-      print "    Archiving ".$bName."...\n";
-      &archiveFile($fullPath, 0, $file, $fileName);
-   }
-
-   # Transfer if needed.
-   if ($config{"remotebackup"}){
-     transferFile($fullPath, $fileName);
-   }
-
-   # Delete if needed.
-   if (!$config{"keeplocalcopy"}){
-     unlink ($fullPath);
-   }
-}
-
-# Description:  Routine for selecting which files to backup.  Upon
-#               completion, a text file containing all the files
-#               within the directory is created depending on the
-#               backup type (inc, or full).
-# Parameter(s): "directory to scan", "name for backup",
-#               "create separate archives for subdirectories if non-zero"
-sub preBackupDir{
-   my $temp;              # Temporary holder for joined files.
-   my $dir      = $_[0];  # Directory to scan.
-   my $name     = $_[1];  # Name for this backup.
-   my $subdirs  = $_[2];  # Create separate archives for subdirs if non-zero
-   my @tmpFiles;          # List of file names.
-
-   # Scan contents of directory
-   if ( $backupType eq "incremental" ) {
-      &scanDir( $dir, $name, 1, $subdirs, \@tmpFiles );
-   } else {
-      &scanDir( $dir, $name, 0, $subdirs, \@tmpFiles );
-   }
-
-   return @tmpFiles;
+  foreach ( @INC ) {
+    if ( -f "$_/$moduleName" ) { return 1; }
+  }
+  return 0;
 }
 
 # Description:  Routine for creating the tar archive.
-# Parameter(s): "filename", "archive type", "filename of list of files", "file"
+# Parameter(s): "Filename of archive to create",
+#               "Name(s) of include/exclude file(s)",
+#               "Non-zero if exclude file"
+# Returns:      Nothing
 sub archiveFile{
-     my $fileName = $_[0];      # Filename (full path) of archive to create.
-     my $archType = $_[1];      # 1 = MultiTar, 0 = SingleTar
-     my $tmpName = $_[2];       # List of files or file to archive.
-     my $file = $_[3];		# File name by itself.
+  my $fileName = $_[0];      # Filename (full path) of archive to create.
+  my $listName = $_[1];      # Name(s) of include/exclude file(s).
+  my $skipFile = $_[2];      # Non-zero if exclude file.
 
-     my $readfrom = $tmpName;
-     $readfrom =~ s/\.list$/\.tmp/;
-
-     # Create the tar archive
-     if ($archType){
-        system("$TARCMD $fileName -T $readfrom -X $tmpName");
-     }
-     else {
-        system($TARCMD." ".$fileName." ".$tmpName);
-     }
-
-     &recordArchive($file);
+  # Create the tar archive.  Use this method instead of system() so that we
+  # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
+  # error messages from tar to stdout so we can catch them.
+  if ( $skipFile ) {
+    open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
+  }
+  else {
+    open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
+  }
+  foreach ( <PROC> ) {
+    if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
+  }
+  close PROC;
 }
 
 # Description:  Routine for transferring a file to the remote backup
 #               location.
 # Parameter(s): "filename to transfer"
+# Returns:      Nothing
 sub transferFile{
-     my $fullPath = $_[0];      # Full path of local archive.
-     my $fileName = $_[1];	# Filename to transfer.
-     my $ftp;			# FTP connection object.
-     my $startTime = time();
-     my $endTime;
-     my $errFlag = 0;
+  my $fullPath = $_[0];      # Full path of local archive.
+  my $fileName = $_[1];      # Filename to transfer.
+  my $ftp;                   # FTP connection object.
+  my $startTime = time();
+  my $endTime;
+  my $errFlag = 0;
 
-     print "    Transferring archive: ".$fileName."...";
-     if ($config{"rbackuptype"} eq "FTP"){
-        $ftp = Net::FTP->new($config{"remotehost"}, Debug => 0) or
-           die ("Unable to connect to remote host! : $!\n");
-        $ftp->login($config{"ftpuser"},$config{"ftppasswd"}) or
-           die ("Unable to login to remote host! : $!\n");
-        $ftp->binary;
-        $ftp->mkdir($remotePath);
-        $ftp->cwd($remotePath) or
-           die ("Unable to change to remote directory! : $!\n");
+  print "    Transferring archive: ".$fileName."...";
+  if ( $config{"rbackuptype"} eq "FTP" ) {
+    $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 0 ) or
+      die ( "Unable to connect to remote host! : $!\n" );
+    $ftp->login( $config{"ftpuser"},$config{"ftppasswd"} ) or
+      die ( "Unable to login to remote host! : $!\n" );
+    $ftp->binary;
+    $ftp->mkdir( $remotePath, 1 );  # Create parent directories if necessary
+    $ftp->cwd( $remotePath ) or
+      die ( "Unable to change to remote directory! : $!\n" );
 
-        # Transfer tar file to remote location
-        $ftp->put($fullPath) or $errFlag = 1;
-        $ftp->quit;
-     }
-     else {
-        copy($fullPath,$nfsPath.$fileName) or $errFlag = 1;
-     }
-     $endTime = time() - $startTime;
-     $xferTime = $xferTime + $endTime;
-     if ($errFlag) {
-        print "FAILED! : $!\n\n";
-     }
-     else {
-        print "done.\n\n";
-     }
+    # Transfer tar file to remote location
+    $ftp->put( $fullPath ) or $errFlag = 1;
+    $ftp->quit;
+  }
+  else {
+    copy( $fullPath,$nfsPath.$fileName ) or $errFlag = 1;
+  }
+  $endTime = time() - $startTime;
+  $xferTime = $xferTime + $endTime;
+  if ( $errFlag ) {
+    print "FAILED! : $!\n\n";
+  }
+  else {
+    print "done.\n\n";
+  }
 }
 
 # Description:  Routine for recursively traversing a directory
 #               and all of its subdirectories in order to build
 #               a list of files to do a incremental or full backup.
 # Parameter(s): "directory to traverse",
-#               "name for backup files",
+#               "Name(s) of include/exclude file(s)",
 #               "type: 0=full, 1=inc",
-#               "create separate archives for subdirectories if non-zero",
-#               "List ref to return file names in",
-#               "filename to write files to"
-# Note:  Last parameter should only be used for recursive calls
+#               "array ref of files/dirs to skip",
+# Returns:      0 = no files to backup, 1 = files to backup
+#               0 = no files to skip,   1 = files to skip
 sub scanDir{
   my $curdir   = $_[0]; # Name of current directory
-  my $bname    = $_[1]; # Name for backup files
+  my $bname    = $_[1]; # Name(s) of include/exclude file(s)
   my $btype    = $_[2]; # Backup type: 0 = FULL, 1 = INCREMENTAL
-  my $subdirs  = $_[3]; # Create separate archives for subdirs if non-zero
-  my $fileList = $_[4]; # List of file names
-  my $fileName = $_[5]; # Filename of file that contains list of files to tar
+  my $skip     = $_[3]; # Array ref for files/dirs to skip
+
   my $name;             # Name of an entry in current directory
   my $fname;            # Fully qualified name of an entry in current directory
   my @dirs;             # List of directories in this directory
-  my $tmp;              # Temporary variable for full file path
-  my $lastmod;          # Last modified date
-  my $top;              # Non-zero if top of recursive calls
-  my $skipFlag = 0;     # Non-zero if we are skipping a file
-  my $checkDir;         # Check this name against array of directories to skip
-  my $haveFile = 0;     # Non-zero if we are backing up a file in this dir
-  my $subHaveFile = 0;  # Non-zero directory has a file
-  my $rc;               # Return code
-
-  if ( not $fileName ) {
-    $fileName = $bname;
-    $top = 1;
-  }
+  my $skipFlag    = 0;  # Temporary flag to indicate there is a file to skip
+  my $haveFile    = 0;  # Non-zero if have file to backup
+  my $skipFile    = 0;  # Non-zero if have file to skip
+  my $subHaveFile = 0;  # Non-zero if subdirectory has file to backup
+  my $subSkipFile = 0;  # Non-zero if subdirectory has file to skip
 
   # Check all entries in this directory
   opendir RT, $curdir or die "opendir \"$curdir\": $!\n";
   while ( $name = readdir RT ) {
     # Ignore this filename if it is '.' or '..'.
-    if ( ( $name eq "\." ) or ( $name eq "\.\." ) ) {
-      next;
-    }
+    if ( ( $name eq "\." ) or ( $name eq "\.\." ) ) { next; }
 
     # Fully qualify the filenamename, and remove redundant slashes.
-    $fname = $curdir."/".$name;
-    $fname =~ s/\/+\//\//g; # Added to remove extra "/" if backing up "/"
+    $fname = "$curdir/$name";
+    $fname =~ s/\/+/\//g; # Added to remove extra "/" if backing up "/"
 
     # Check if we should skip this filename.
-    foreach ( @skipDirs ) {
-      if ( $fname eq $_ ) {
-        &addToExclude( $fname, $fileName, $fileList );
+    foreach ( @{ $skip } ) {
+      if ( $fname =~ $_ ) {
+        &addToExclude( $fname, $bname );
+        $skipFile = 1;
         $skipFlag = 1;
         last;
       }
     }
-    if ( $skipFlag ) {
-      # Reset skip flag
-      $skipFlag = 0;
-    }
+
+    # Reset skip flag if necessary
+    if ( $skipFlag ) { $skipFlag = 0; }
 
     # If this filename is a directory, add it to the list of directories.
     elsif ( ( -d $fname ) and ( not -l $fname ) ) {
@@ -371,38 +299,37 @@ sub scanDir{
     # from an incremental backup.
     elsif ( ( -f $fname ) or ( -l $fname ) ) {
       if ( ( $btype ) and ( &excludeFile( $fname ) ) ) {
-        &addToExclude( $fname, $fileName, $fileList );
+        &addToExclude( $fname, $bname );
+        $skipFile = 1;
       } else {
         $haveFile = 1;
-	$foundFiles = 1;
       }
     }
 
     # Exclude anything else.
     else {
-      &addToExclude( $fname, $fileName, $fileList );
+      &addToExclude( $fname, $bname );
+      $skipFile = 1;
     }
   }
-
   closedir RT;
 
   # Recursively call this function on each directory in this directory
   foreach ( @dirs ) {
-    # Make a new dirlist for each subdirectory
-    if ( ( $top ) and ( $subdirs ) ) {
-      if ( fileno DIRLIST ) {
-        close DIRLIST;
-      }
-      $fileName = $bname.".".$_;
-    }
-    $rc = &scanDir( $curdir."/".$_, $bname, $btype, $subdirs, $fileList,
-      $fileName );
+    ( $subHaveFile, $subSkipFile ) =
+      &scanDir( "$curdir/$_", $bname, $btype, $skip );
 
-    # Exclude sub directory if it doesn't have any files to back up
-    if ( ( $rc == 0 ) and ( $btype ) ) {
-      &addToExclude( $curdir."/".$_, $fileName, $fileList );
-    } else {
-      $subHaveFile = 1;
+    # Exclude subdirectory if it doesn't have any files to back up
+    # Always include subdirectory on full backup
+    if ( ( $subHaveFile == 0 ) and ( $btype ) ) {
+      &addToExclude( "$curdir/$_", $bname );
+      $skipFile = 1;
+    }
+
+    # Otherwise indicate that subdirectories have files
+    else {
+      if ( $subSkipFile == 1 ) { $skipFile = 1; }
+      $haveFile = 1;
     }
   }
 
@@ -410,297 +337,280 @@ sub scanDir{
   # even if we don't
   if ( ( $btype ) and ( not &excludeFile( $curdir ) ) ) {
     $haveFile = 1;
-    $foundFiles = 1;
-  }
-
-  # Close last directory list before exiting
-  if ( $top ) {
-    if ( $subHaveFile+$haveFile == 0 ) {
-      &addToExclude( $curdir, $fileName, $fileList );
-    }
-    if ( fileno DIRLIST ) { close DIRLIST; }
   }
 
   # Return non-zero if we or our sub dirs have a file to back up
-  return $subHaveFile+$haveFile;
+  return $haveFile, $skipFile;
 }
 
 # Description:  Routine for parsing the configuration file into
 #               a key-value associative array.
 # Parameter(s): none.
-sub parseConfig
-{
-    my $cfgFile;
-    my $argNum = @ARGV;
-    if ( ($argNum == 0 ) || ( $argNum > 1 ) ) {
-       &usage;
-       exit;
+# Returns:      Nothing
+sub parseConfig {
+  my $cfgFile;
+  my $argNum = @ARGV;
+  if ( ( $argNum == 0 ) || ( $argNum > 1 ) ) {
+    &usage;
+    exit;
+  }
+  if ( $argNum == 1 ) {
+    my $arg = $ARGV[0];
+    if ( $arg =~ /^-h$|^--help$|^--usage$/ ) {
+      &usage;
+      exit;
     }
-    if ($argNum == 1) {
-       my $arg = $ARGV[0];
-       if ($arg =~ /^-h$|^--help$|^--usage$/) {
-          &usage;
-          exit;
-       }
-       elsif ($arg =~ /^-v$|^--version$/) {
-          &version;
-          exit;
-       }
-       elsif (-f $arg) {
-          $cfgFile = $arg;
-       }
-       else {
-          &usage;
-          exit;
-       }
+    elsif ( $arg =~ /^-v$|^--version$/ ) {
+      &version;
+      exit;
     }
+    elsif ( -f $arg ) {
+      $cfgFile = $arg;
+    }
+    else {
+      &usage;
+      exit;
+    }
+  }
 
-    my ($var, $val);
-    open(CONF, "<$cfgFile") || die "Cannot find config file: $!\n";
-    while (<CONF>) {
-        chomp;                      # no newline
-        s/#.*//;                    # no comments
-        s/^\s+//;                   # no leading white
-        s/\s+$//;                   # no trailing white
-        next unless length;         # anything left?
-        ($var, $val) = split(/\s*=\s*/, $_, 2);
-        $config{$var} = $val;       # load config value into the hash
+  my ( $var, $val );
+  open( CONF, "<$cfgFile" ) || die "Cannot find config file: $!\n";
+  while ( <CONF> ) {
+    chomp;                              # no newline
+    if ( $_ !~ /^\s*ftppasswd\s*=/ ) {  # don't remove comments in FTP passwords
+      s/#.*//;                          # no comments
     }
-    close(CONF);
+    s/^\s+//;                           # no leading white
+    s/\s+$//;                           # no trailing white
+    next unless length;                 # anything left?
+    ( $var, $val ) = split( /\s*=\s*/, $_, 2 );
+    $config{$var} = $val;               # load config value into the hash
+  }
+  close( CONF );
 }
 
 # Description:  Routine for for determining what type of backup to
 #               perform.
 # Parameter(s): none.
-sub backupType
-{
-    # Parse configuration and load variables to the hash table
-    &parseConfig;
+# Returns:      Nothing
+sub backupType {
+  $fstat = $config{"datadir"}."status.dat";
+  $archFiles = $config{"datadir"}."archives.dat";
 
-    $fstat = $config{"datadir"}."status.dat";
-    $archFiles = $config{"datadir"}."archives.dat";
+  my $backupDays;     # Number of days to keep backups.
+  my @bstatus;        # Array containing counter and last full backup time.
+                      # Key:
+                      # 0 = Backup counter, 1 = Last full backup
+  my $lTime;          # Temporary variable for time conversion.
 
-    my $backupDays;     # Number of days to keep backups.
-    my @bstatus;        # Array containing counter and last full backup time.
-        # Key:
-        # 0 = Backup counter, 1 = Last full backup
-    my $lTime;          # Temporary variable for time conversion.
+  # Prepare date and time stamps
+  chomp( $DATESTAMP );
+  chomp( $DATESTAMPD );
+  chomp( $TIMESTAMP );
 
-    # Prepare date and time stamps
-    chomp($DATESTAMP);
-    chomp($DATESTAMPD);
-    chomp($TIMESTAMP);
+  $backupDays = $config{"backupdays"};
 
-    $backupDays = $config{"backupdays"};
+  # Initialize default values
+  $bCounter = 1;
+  $backupType = "full";
+  $lastFull = $startTime;
 
-    # Initialize default values
-    $bCounter = 1;
-    $backupType = "full";
-    $lastFull = $startTime;
+  if ( -e $fstat ) {
+    # Status file exists, check to see what type of backup to
+    # perform.
+    open ( FILESTATUS, "<$fstat" );
+    @bstatus = split ( ",",`cat $fstat` );
 
-    if ( -e $fstat ){
-      # Status file exists, check to see what type of backup to
-      # perform.
-      open (FILESTATUS, "<$fstat");
-      @bstatus = split (",",`cat $fstat`);
+    # Increment backup counter
+    $bCounter = $bstatus[0] + 1;
+    $lastFull = $bstatus[1];
 
-      # Increment backup counter
-      $bCounter = $bstatus[0] + 1;
-      $lastFull = $bstatus[1];
-
-      # For EXAMPLE backupDays = 7
-      ####################################################################
-      # 1 = FULL 			8  = FULL
-      # 2 = INCREMENTAL  		9  = INCREMENTAL
-      # 3 = INCREMENTAL  		10 = INCREMENTAL
-      # 4 = INCREMENTAL  		11 = INCREMENTAL
-      # 5 = INCREMENTAL  		12 = INCREMENTAL
-      # 6 = INCREMENTAL  		13 = INCREMENTAL
-      # 7 = INCREMENTAL (DELETE 8-14)  	14 = INCREMENTAL (DELETE 1-7)
-      ####################################################################
-      if ( ( $bCounter - 1 ) % $backupDays ) {
-        $backupType = "incremental";
-      }
-
-      # Reached the end of backup cycle (backup days * 2)
-      # reset counter and do FULL backup.
-      elsif ($bCounter > ($backupDays * 2)) {
-         $bCounter = 1;
-         $lastFull = $startTime;
-      }
-      # Counter is equal to backup days + 1
-      else {
-        $lastFull = $startTime;
-      }
+    # For EXAMPLE backupDays = 7
+    ####################################################################
+    # 1 = FULL                        8  = FULL
+    # 2 = INCREMENTAL                 9  = INCREMENTAL
+    # 3 = INCREMENTAL                 10 = INCREMENTAL
+    # 4 = INCREMENTAL                 11 = INCREMENTAL
+    # 5 = INCREMENTAL                 12 = INCREMENTAL
+    # 6 = INCREMENTAL                 13 = INCREMENTAL
+    # 7 = INCREMENTAL ( DELETE 8-14 )   14 = INCREMENTAL ( DELETE 1-7 )
+    ####################################################################
+    if ( ( $bCounter - 1 ) % $backupDays ) {
+      $backupType = "incremental";
     }
 
-    $lTime = localtime($lastFull);
-    print "\nRunning backup on ".$config{"host"}.".\n";
-    print "Backup number $bCounter of ".($backupDays*2).
-       " \(backup days x 2\)\n";
-    print qq/Performing $backupType backup via $config{"rbackuptype"}\n/;
-    print qq/Last full backup: $lTime\n\n/;
+    # Reached the end of backup cycle ( backup days * 2 )
+    # reset counter and do FULL backup.
+    elsif ( $bCounter > ( $backupDays * 2 ) ) {
+      $bCounter = 1;
+      $lastFull = $startTime;
+    }
+    # Counter is equal to backup days + 1
+    else {
+      $lastFull = $startTime;
+    }
+  }
+
+  $lTime = localtime( $lastFull );
+  &version;
+  print "\nRunning backup on $config{'host'}.\n";
+  print "Backup number $bCounter of ".( $backupDays*2 )." (backup days x 2)\n";
+  if ( $config{'remotebackup'} ) {
+    print "Performing $backupType backup via $config{'rbackuptype'}\n";
+  } else {
+    print "Performing $backupType backup on local system\n";
+  }
+  print "Last full backup: $lTime\n\n";
 }
 
+# Description:  Process file containing definitions of files/directories to
+#               backup
+# Parameter(s): none.
+# Returns:      Nothing
 sub processFiles {
-  my $tmpExt = ".tmp";
-  my $tmpStr;
-  my $tmpFile;
-  my $realStr;
-  my $archFile;
-  my $skipFile;
-  my $skipLine;
-  my @skipItems;
-  my @archFiles;
-  my $misc = $config{"files"};
+  # In the lists below, there is one entry for each "File:" directive.  This
+  # entry is the archive name for @arcfile, and a list of files/directories
+  # to archive or skip for @arc and @skip.
 
-  open FILE, "<$misc" or
-     die "Cannot open \"$misc\": $!\n";
+  my @arcfile;   # List of names of archives to create
+  my @arc;       # List of lists of files/directories to archive
+  my @skip;      # List of lists of files/directories to skip
+  my $fileName;  # Temporary variable to hold a filename
+  my $i = -1;    # Index into @arc and @skip lists
 
+  # Open file  containing definitions of files/directories to backup
+  open FILE, "<$config{'files'}" or
+    die "Cannot open \"$config{'files'}\": $!\n";
+
+  # Process the file
   foreach ( <FILE> ) {
-     if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
-        chop $_;                                      # Remove trailing newline
+    if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
+      chomp $_;                                      # Remove trailing newline
 
-        if (/^file:/i) {
-           # Close previously opened file if any.
-           if ( fileno ARCHFILE ) {
-              close ARCHFILE;
-           }
-           if ( fileno SKIPFILE ) {
-              close SKIPFILE;
-           }
-           $tmpFile = $'; # Grab right end of the match.
-           $tmpFile =~ s/\s+//g;
-           $archFile = $config{"tmpdir"} . $tmpFile . $tmpExt;
-           $skipFile = $config{"tmpdir"} . $tmpFile . "_SKIP" . $tmpExt;
-           push @archFiles, $tmpFile;
-           open ARCHFILE, ">$archFile" or
-              die "open \"$archFile\": $!\n";
-        }
-        elsif (/^skip:/i) {
-           $skipLine = $'; # Grab right end of the match.
-           $skipLine =~ s/\s+//g;
-           @skipItems = split (",",$skipLine);
-           if ( not fileno SKIPFILE ) {
-              open SKIPFILE, ">$skipFile" or
-                 die "open \"$skipFile\": $!\n";
-           }
-           foreach (@skipItems){
-              print SKIPFILE "$_\n";
-           }
-        }
-        else {
-           print ARCHFILE "$_\n";
-        }
-     }
-  }
-  if ( fileno SKIPFILE ) {
-     close SKIPFILE;
-  }
-  if ( fileno ARCHFILE ) {
-     close ARCHFILE;
-  }
+      # File: directive - starts a new archive
+      if ( /^file:/i ) {
+        $fileName = $';                  # Grab name of file
+        $fileName =~ s/\s+//g;           # Strip leading whitespace
+        push @arcfile, $fileName;        # Push onto list of archives to create
+        $i++;                            # Increment archive counter
+      }
 
-  foreach (@archFiles) {
-     my $fullSkipFile = $config{"tmpdir"}.$_."_SKIP".$tmpExt;
-     my $fullArchFile = $config{"tmpdir"}.$_.$tmpExt;
-     if ( -e $fullSkipFile ){
-        open (SKIPDIRS, "<$fullSkipFile");
-        @skipDirs = <SKIPDIRS>;
-        chomp(@skipDirs);
-        # Remove temporary file
-        unlink ( $fullSkipFile );
-     }
-     backupMisc($_, $fullArchFile);
+      # Skip: directive - file/directory to skip.  Add beginning and end of
+      # line characters to file/directory name for later use in scanDir.
+      elsif ( /^skip:/i ) {
+        $fileName = $';                          # Grab name of file
+        $fileName =~ s/\s+//g;                   # Strip leading whitespace
+        push @{ $skip[$i] }, '^'.$fileName.'$';  # Push onto current skip list
+      }
 
-     # Remove temporary file
-     unlink ( $fullArchFile );
+      # File/directory to archive
+      else {
+        push @{ $arc[$i] }, $_;             # Push onto current archive list
+      }
+    }
   }
+  close FILE;
 
+  # Backup each archive read from the file
+  $i = 0;                                   # Reset index
+  foreach ( @arcfile ) {
+    backupMisc( $_, $arc[$i], $skip[$i] );  # Pass refs to arc and skip lists
+    $i++;                                   # Increment index to next archive
+  }
 }
 
 # Description:  Routine to back up files in files.cfg
-# Parameter(s): none.
+# Parameter(s): "name for backup",
+#               "array ref for files/dirs to archive",
+#               "array ref for files/dirs to skip"
+# Returns:      Nothing
 sub backupMisc {
-  my $fileName;
-  my $tarName;
-  my $gotfiles = 0;
-  my $btype;
-  my $lastmod;
-  my $fullPath;
-  my $bName = $_[0];
-  my $misc = $_[1];
+  my $bName = $_[0];    # Name for backup
+  my $arc   = $_[1];    # Array ref for files/dirs to archive
+  my $skip  = $_[2];    # Array ref for files/dirs to skip
 
-  $foundFiles = 0; #Reset for each archive.
+  my $haveFile     = 0; # Non-zero if have file to backup
+  my $skipFile     = 0; # Non-zero if have file to skip
+  my $tempHaveFile = 0; # Non-zero if scanDir finds file to backup
+  my $tempSkipFile = 0; # Non-zero if scanDir finds file to skip
+  my $btype;            # Backup type as a number (0 = FULL, 1 = INCREMENTAL)
+  my $fileName;         # Name(s) of include/exclude file(s)
+  my $fullPath;         # Full path to tar file to create
+  my $tarName;          # Nmae of tar file to create
 
   print "  Working on $bName...\n";
 
-  open FILE, "<$misc" or
-     die "Cannot open \"$misc\": $!\n";
+  # Initialize some variables
+  $btype    = $backupType eq "incremental" ? 1 : 0; # Backup type as a number.
+  $fileName = $config{"tmpdir"}.$bName;
 
-  $btype = $backupType eq "incremental" ? 1 : 0;
-  $fileName = $config{"tmpdir"}.$bName.".list";
+  foreach ( @{ $arc } ) {
+    # For a directory, call scanDir to recursively back it up
+    if ( ( -d $_ ) and ( not -l $_ ) ) {
+      ( $tempHaveFile, $tempSkipFile ) =
+        &scanDir( $_, "$fileName.excl", $btype, $skip );
 
-  foreach ( <FILE> ) {
-    if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
-      chop $_;                                       # Remove trailing newline
-      if ( ( -d $_ ) and ( not -l $_ ) ) {
-        if ( &preBackupDir( $_, $fileName, 0 ) ) {
-          $gotfiles = 1;
-        }
-      } elsif ( ( -f $_ ) or ( -l $_ ) ) {
-        if ($btype){
-          # Only back up file if it is new or changed
-          $lastmod = ( stat( $_ ) )[10];
-          if ( ( $lastmod ) and ( $lastmod <= $lastFull ) ) {
-            next;
-          }
-        }
-        # Open list of files if not already open
-        if ( not fileno DIRLIST ) {
-          open DIRLIST, ">>$fileName" or
-            die "open \"$fileName\": $!\n";
-          $gotfiles = 1;
-        }
-        # Collapse multiple slashes into one before writting file name to file
-        $_ =~ s/\/+\//\//g;
-        print DIRLIST "$_\n";
+      # If any files to backup, add this directory in include file and set
+      # the flag indicating this archive has files to backup
+      if ( $tempHaveFile ) {
+        # Add this file to list of files to include
+        &addToInclude( $_, "$fileName.incl" );
+        $haveFile = 1;
+      }
+      # If any files to backup, set the flag indicating this archive has
+      # files to skip
+      if ( $tempSkipFile ) { $skipFile = 1; }
+    }
+
+    # For a file or symlink, simply add it to the list of files to backup
+    # NOTE: if the user includes a file and also includes a skip directive,
+    # this will not catch the skip directive!
+    elsif ( ( -f $_ ) or ( -l $_ ) ) {
+      # Check if we should skip this filename.
+      if ( ( $btype ) and ( &excludeFile( $_ ) ) ) {
+        # NOTE:  may not have to add to exclude, may just be able to skip
+        &addToExclude( $_, "$fileName.incl" );
+        $skipFile = 1;
+      } else {
+        &addToInclude( $_, "$fileName.incl" );
+        $haveFile = 1;
       }
     }
   }
 
-  close FILE;
-  close DIRLIST;
+  # Close include and exclude files
+  close INCLFILE;
+  close EXCLFILE;
 
-#  if ( $gotfiles ) {   # Commenting this line because of new way of backups to preserve
-			# permissions.
-  if ( $foundFiles ) {
+  # Create archive if there are any files to backup
+  if ( $haveFile ) {
+    # Create name of tar file and full path to tar file
     $tarName = $config{"host"}."-".$bName."-".$backupType."-".
         $DATESTAMP."-".$TIMESTAMP."\.".$bCounter.$EXT;
-
     $fullPath = $localPath.$tarName;
 
-    # Tar backup files
+    # Tar backup files and record it.  Need to let archiveFile() know if we
+    # have a list of files to skip to prevent an error on the tar command.
     print "    Archiving ".$bName."...\n";
-    &archiveFile($fullPath, 1, $fileName, $tarName);
+    &archiveFile( $fullPath, $fileName, $skipFile );
+    &recordArchive( $tarName );
 
     # Transfer if needed.
-    if ($config{"remotebackup"}){
-      transferFile($fullPath, $tarName);
-    }
+    if ( $config{"remotebackup"} ) { transferFile( $fullPath, $tarName ); }
 
     # Delete if needed.
-    if (!$config{"keeplocalcopy"}){
-      unlink ($fullPath);
+    if ( !$config{"keeplocalcopy"} ) {
+      truncTar( $fullPath );
+      unlink ( $fullPath );
     }
   }
   else {
-      print "    No new or changed files since last full backup for ".
-         $bName.".\n\n";
+    print "    No new or changed files since last full backup for $bName.\n\n";
   }
 
-  # Remove temporary file
-  unlink ( $fileName );
+  # Remove temporary files
+  if ( $haveFile ) { unlink ( "$fileName.incl" ); }
+  if ( $skipFile ) { unlink ( "$fileName.excl" ); }
 }
 
 # Description:  Routine to check if a file should be excluded from an
@@ -712,7 +622,7 @@ sub excludeFile {
   my $file     = $_[0]; # File to check
   my $lastmod;          # Last modified date
 
-  $lastmod = ( stat( $file ) )[10];
+  $lastmod = ( lstat( $file ) )[10];
   if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
     # File was modified since last full backup.  Do not exclude it.
     return 0;
@@ -725,214 +635,241 @@ sub excludeFile {
 #               files to exclude from a backup.
 # Parameter(s): "name of file to add",
 #               "name of file to write to",
-#               "list ref to return exclude file names in"
 # Returns:      Nothing.
 sub addToExclude {
   my $file     = $_[0]; # File to check
   my $fileName = $_[1]; # Filename to write files to
-  my $fileList = $_[2]; # List of file names
 
   # Open exclude file if it isn't already open, and push the name on
   # the list of exclude file names.
-  if ( not fileno DIRLIST ) {
-    push @{ $fileList }, $fileName;
-    open DIRLIST, ">>$fileName" or die "open \"$fileName\": $!\n";
+  if ( not fileno EXCLFILE ) {
+    open EXCLFILE, ">>$fileName" or die "open \"$fileName\": $!\n";
   }
 
   # Collapse multiple slashes into one before writting file name to file
   $file =~ s/\/+\//\//g;
 
   # Write the name of the file to exclude.
-  print DIRLIST "$file\n";
+  print EXCLFILE "$file\n";
 }
 
-# Description:  Routine to check if a file should be included in
-#               the backup.  Writes the file (or directory) name to
-#               a file to be used by tar later on.
-# Parameter(s): "file to check",
-#               "filename to write files to"
-#               "type: 0=full, 1=inc",
-#               "List ref to return file names in",
-sub addToFile {
+# Description:  Routine to add a filename to a file that lists all
+#               files to include from a backup.
+# Parameter(s): "name of file to add",
+#               "name of file to write to",
+# Returns:      Nothing.
+sub addToInclude {
   my $file     = $_[0]; # File to check
   my $fileName = $_[1]; # Filename to write files to
-  my $btype    = $_[2]; # Backup type: 0 = FULL, 1 = INCREMENTAL
-  my $fileList = $_[3]; # List of file names
-  my $subdirs  = $_[4]; # If true, then $fileName is already complete.
-  my $lastmod;          # Last modified date
-  my $fullPath;
 
-  if ($subdirs) {
-     $fullPath = $config{"tmpdir"}.$fileName;
-  }
-  else {
-     $fullPath = $fileName;
+  # Open exclude file if it isn't already open, and push the name on
+  # the list of exclude file names.
+  if ( not fileno INCLFILE ) {
+    open INCLFILE, ">>$fileName" or die "open \"$fileName\": $!\n";
   }
 
-  if ( ( $file ne "\." ) and ( $file ne "\.\." ) ) {  # Ignore . and ..
-    if ($btype){
-      $lastmod = ( stat( $file ) )[10];
-      if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
-        if ( not fileno DIRLIST ) {
-          push @{ $fileList }, $fileName;
+  # Collapse multiple slashes into one before writting file name to file
+  $file =~ s/\/+\//\//g;
 
-          open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
-        }
-        # Collapse multiple slashes into one before writting file name to file
-        $file =~ s/\/+\//\//g;
-        print DIRLIST "$file\n";
-      }
-    } else {
-      if ( not fileno DIRLIST ) {
-        push @{ $fileList }, $fileName;
-        open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
-      }
-      # Collapse multiple slashes into one before writting file name to file
-      $file =~ s/\/+\//\//g;
-      print DIRLIST "$file\n";
+  # Write the name of the file to exclude.
+  print INCLFILE "$file\n";
+}
+
+# Description:  Routine to names of archives
+# Parameter(s): "name of file to add",
+#               "name of file to write to",
+# Returns:      Nothing.
+sub recordArchive{
+  my $file = $_[0];    # Tar file to record
+
+  # Record archives
+  open ARCHIVES, ">>$archFiles" or die "Cannot open archive file ".
+    "$archFiles (check your 'datadir' configuration setting)\n";
+
+  if ( $config{"remotebackup"} ) {
+    if ( $config{"rbackuptype"} eq "FTP" ) {
+      print ARCHIVES "$bCounter,$localPath,$remotePath,$file\n";
+    }
+    else {
+      print ARCHIVES "$bCounter,$localPath,$config{'localmount'}".
+        "$DATESTAMPD/,$file\n";
     }
   }
+  else {
+    print ARCHIVES "$bCounter,$localPath,/,$file\n";
+  }
+  close ARCHIVES;
 }
 
-
-sub recordArchive{
-   my $file = $_[0];	# Tar file to record
-
-   # Record archives
-   open (ARCHIVES, ">>$archFiles");
-   if ($config{"rbackuptype"} eq "FTP"){
-      print ARCHIVES $bCounter.",".$localPath.",".$remotePath.",".$file."\n";
-   }
-   else {
-      print ARCHIVES $bCounter.",".$localPath.",".$config{"localmount"}.$DATESTAMPD."\/".",".$file."\n";
-   }
-   close ARCHIVES;
-}
-
+# Description:  Routine to convert time from a number to a string
+# Parameter(s): "Time as a number"
+# Returns:      "Time as a string"
 sub timeCalc{
   my $endTime = $_[0];
 
-  if ($endTime > 3600){
-     $endTime = ($endTime / 3600);
-     $endTime = sprintf "%.2f", $endTime;
-     $endTime = $endTime." hour(s)";
+  if ( $endTime > 3600 ) {
+    $endTime = ( $endTime / 3600 );
+    $endTime = sprintf "%.2f", $endTime;
+    $endTime = $endTime." hour(s)";
   }
-  elsif ($endTime > 60){
-     $endTime = ($endTime / 60);
-     $endTime = sprintf "%.2f", $endTime;
-     $endTime = $endTime." minute(s)";
+  elsif ( $endTime > 60 ) {
+    $endTime = ( $endTime / 60 );
+    $endTime = sprintf "%.2f", $endTime;
+    $endTime = $endTime." minute(s)";
   }
   else {
-     $endTime = sprintf "%.2f", $endTime;
-     $endTime = $endTime." seconds(s)";
+    $endTime = sprintf "%.2f", $endTime;
+    $endTime = $endTime." seconds(s)";
   }
   return $endTime;
 }
 
+# Description:  Routine to delete old archives
+# Parameter(s): None
+# Returns:      Nothing
 sub processDeletions{
-   my $ftp;             # Object for FTP connection.
-   my @records; 	# Tar files to process.
-   my @record;		# A single tar file.
-   my $backupDays;     	# Number of days to keep backups.
-   my $firstDel;
-   my $secondDel;
-   my $file;
-   my $ldir;
-   my $rdir;
-   my $tmpFile = $config{"tmpdir"}."archives.tmp";
-   my ($upper, $lower, $buNum);
+  my $ftp;             # Object for FTP connection.
+  my @records;         # Tar files to process.
+  my @record;          # A single tar file.
+  my $backupDays;      # Number of days to keep backups.
+  my $firstDel;
+  my $secondDel;
+  my $file;
+  my $ldir;
+  my $rdir;
+  my $tmpFile = $config{"tmpdir"}."archives.tmp";
+  my ( $upper, $lower, $buNum );
 
-   $backupDays = $config{"backupdays"};
-   $firstDel = $backupDays+1;
-   $secondDel = $backupDays*2;
+  $backupDays = $config{"backupdays"};
+  $firstDel = $backupDays+1;
+  $secondDel = $backupDays*2;
 
-   if ( ($bCounter == $backupDays) or
-        ($bCounter == $secondDel) ){
+  if ( ( $bCounter == $backupDays ) or ( $bCounter == $secondDel ) ) {
+    print "Deletions of old back-ups in progress...";
 
-      print "Deletions of old back-ups in progress...";
+    open ( TARS, $archFiles );
+    @records = <TARS>;
+    close TARS;
 
-      open (TARS, $archFiles);
-      @records = <TARS>;
-      close TARS;
+    open ( TMPFILE, ">$tmpFile" );
 
-      open (TMPFILE, ">$tmpFile");
-
-      # i.e. if counter is 7, delete 8-14
-      if ($bCounter == $backupDays){
-         $lower = $firstDel;
-         $upper = $secondDel;
+    # i.e. if counter is 7, delete 8-14
+    if ( $bCounter == $backupDays ) {
+      $lower = $firstDel;
+      $upper = $secondDel;
+    }
+    # otherwise delete 1-7
+    else {
+      $lower = 1;
+      $upper = $backupDays;
+    }
+    # Login to remote host if necessary
+    if ( $config{"remotebackup"} ) {
+      if ( $config{"rbackuptype"} eq "FTP" ) {
+        $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 0 ) or
+          warn ( "  Unable to connect to remote host! : $!\n" );
+        $ftp->login( $config{"ftpuser"},$config{"ftppasswd"} ) or
+          warn ( "  Unable to login to remote host! : $!\n" );
       }
-      # otherwise delete 1-7
+    }
+    foreach ( @records ) {
+      chomp;
+      @record = split ( ",",$_ );
+      $buNum = $record[0];
+      $ldir = $record[1];
+      $rdir = $record[2];
+      $file = $record[3];
+
+      if ( ( $buNum >= $lower ) and ( $buNum <= $upper ) ) {
+
+        # Delete local backup.
+        if ( $config{"keeplocalcopy"} ) {
+          truncTar( $ldir.$file );
+          unlink ( $ldir.$file ) or
+            warn ( "    Unable to delete local file! : $!\n" );
+          rmdir ( $ldir );
+        }
+
+        # Delete from remote host.
+        if ( $config{"remotebackup"} ) {
+          if ( $config{"rbackuptype"} eq "FTP" ) {
+            $ftp->cwd( $rdir ) or
+              warn ( "    Unable to change to remote directory! : $!\n" );
+            $ftp->delete( $file ) or
+              warn ( "    Unable to delete remote file! : $!\n" );
+            $ftp->rmdir( $rdir );
+          }
+          else {
+            truncTar( $rdir.$file );
+            unlink ( $rdir.$file ) or
+              warn ( "    Unable to delete remote file! : $!\n" );
+            rmdir ( $rdir );
+          }
+
+        }
+      }
       else {
-         $lower = 1;
-         $upper = $backupDays;
+        # Write left over entries back to file.
+        print TMPFILE $_."\n";
       }
-      # Login to remote host if necessary
-      if ($config{"remotebackup"}){
-         if ($config{"rbackuptype"} eq "FTP"){
-            $ftp = Net::FTP->new($config{"remotehost"}, Debug => 0) or
-               warn ("  Unable to connect to remote host! : $!\n");
-            $ftp->login($config{"ftpuser"},$config{"ftppasswd"}) or
-               warn ("  Unable to login to remote host! : $!\n");
-	 }
-      }
-      foreach ( @records ){
-         chomp;
-         @record = split (",",$_);
-	 $buNum = $record[0];
-         $ldir = $record[1];
-         $rdir = $record[2];
-         $file = $record[3];
+    }
+    close TMPFILE;
 
-         if ( ( $buNum >= $lower ) and ( $buNum <= $upper ) ) {
+    unlink( $archFiles ) or die ( "    Unable to delete $archFiles!: $!\n" );
+    move( $tmpFile, $archFiles ) or
+      die ( "    Unable to rename $tmpFile to $archFiles!: $!\n" );
 
-            # Delete local backup.
-            if ($config{"keeplocalcopy"}){
-               unlink ($ldir.$file) or
-                  warn ("    Unable to delete local file! : $!\n");
-               rmdir ($ldir);
-            }
-
-            # Delete from remote host.
-            if ($config{"remotebackup"}){
-               if ($config{"rbackuptype"} eq "FTP"){
-                  $ftp->cwd($rdir) or
-                     warn ("    Unable to change to remote directory! : $!\n");
-                  $ftp->delete($file) or
-                     warn ("    Unable to delete remote file! : $!\n");
-	          $ftp->rmdir($rdir);
-	       }
-	       else {
-	          unlink ($rdir.$file) or
-                     warn ("    Unable to delete remote file! : $!\n");
-		  rmdir ($rdir);
-	       }
-
-            }
-         }
-         else {
-            # Write left over entries back to file.
-            print TMPFILE $_."\n";
-         }
-      }
-      close TMPFILE;
-
-      unlink($archFiles) or die ("    Unable to delete $archFiles!: $!\n");
-      move($tmpFile, $archFiles) or die ("    Unable to rename
-         $tmpFile to $archFiles!: $!\n");
-
-      # Close connection if necessary
-      if ($config{"remotebackup"}){
-         $ftp->quit unless $config{"rbackuptype"} eq "NFS";
-      }
-      print "done.\n\n";
-   }
+    # Close connection if necessary
+    if ( $config{"remotebackup"} ) {
+      $ftp->quit unless $config{"rbackuptype"} eq "NFS";
+    }
+    print "done.\n\n";
+  }
 }
 
+# Description:  Routine to create directory, similar to 'mkdir -p'
+# Parameter(s): "path to directory to create"
+# Returns:      0 if failed, non-zero if successful.
+sub mkdirp {
+  my $fullpath;                         # Full path to create
+  my @path      = split /\/+/, shift;   # Components of path for new directory
+  my $perm      = shift;                # Permission for new directory
+  foreach ( @path ) {
+    $fullpath .= "$_/";                 # Build up path to directory
+    mkdir ( $fullpath, $perm );
+  }
+  if ( ! -d $fullpath ) { return 0; }   # Fail if directory does not exist
+  return 1;                             # Success
+}
+
+# Description:  Truncate tar file.  Needed for versions of Perl that do not
+#               support large files.  Note that both the filesystem and tar
+#               have to support large files in order to create the large
+#               archive in the first place.
+# Parameter(s): "Archive to truncate"
+# Returns:      Nothing
+sub truncTar {
+  my $fileName = $_[0];
+
+  # Truncate the archive by simply archiving the file containing definitions
+  # of files/directories to backup.  This file *should* be less than 2GB.
+  open PROC, "$TARCMD $fileName $config{'files'} 2>&1|";
+  foreach ( <PROC> ) {
+    if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
+  }
+  close PROC;
+}
+
+# Description:  Print version information
+# Parameter(s): None
+# Returns:      Nothing
 sub version {
   print "REOBack version $VERSION; distributed under the GNU GPL.\n";
 }
 
+# Description:  Print usage information
+# Parameter(s): None
+# Returns:      Nothing
 sub usage {
   print << "END_OF_INFO";
 
@@ -942,8 +879,8 @@ REOBack Simple Backup Solution ver. $VERSION
 Usage: reoback.pl [options] [<configfile>]
 
 Options:
--v, --version		Display version information.
--h, --help, --usage	Display this help information.
+-v, --version           Display version information.
+-h, --help, --usage     Display this help information.
 
 See http://sourceforge.net/projects/reoback/ for project info.
 
@@ -965,6 +902,61 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.14  2002/03/23 03:28:12  griswold
+#
+#
+# - Check if Net::FTP is installed when doing an FTP remote backup,
+#   * Fixes bug 463642
+#
+# - Automatically create directories from settings.conf if they do not
+#   exist.  Parent directories are created if necessary.
+#   * First half of fix for bug 482380
+#
+# - Better error checking and reporting.
+#   * Second half of fix for bug 482380
+#
+# - Removes large (>2GB) archives, even if Perl does not have large file
+#   support.  This relies on the tar command having large file support
+#   enabled, but both the file system and the tar command have to have
+#   large file support to create a file larger than 2GB.
+#   * Fixes bug 521843
+#
+# - Skip removing comments for FTP passwords.  REOBack will now treat
+#   everything after 'ftppasswd = ' as a password, except for leading and
+#   trailing whitespace.  For example, for the line
+#   'ftppasswd   =   my##password   ', REOBack will extract 'my##password'
+#   as the FTP password.
+#   * Fixes bug 506178
+#
+# - Correctly handle the case where there are no files to skip.
+#
+# - Fixed a bug with checking for the last modification time for symbolic
+#   links.
+#
+# - Perl regular expressions (wild cards) for Skip: directives.  For
+#   example, to skip all files and directories in your home directory that
+#   start with a dot, you can use:
+#
+#     Skip: /home/myself/\..*
+#
+#   Wondering what '\..*' does?  The leading backslash, '/', tells REOBack
+#   (actually Perl) to treat the next dot, '.', as a literal dot.  The
+#   third dot tells Perl to match any character, and the asterisk, '*',
+#   tells Perl to perform the match zero or more times.
+#
+# - Suppress "Removing leading `/'" message from tar.
+#
+# - Prints correct backup type.
+#
+# - Prints version each time it is run.
+#
+# - Creates fewer temporary files.
+#
+# - General code streamlining and cleanup.
+#
+# - Removed version reoback.pl 1.14 and 1.15 from SourceForge, since there
+#   were minor problems with these versions.
+#
 # Revision 1.13  2001/11/15 03:49:41  techno91
 # - Major bug fix.  Richard applied a fix to preserve directory permissions
 #   upon restore by changing the algorithm of tar to take an exclude file.
