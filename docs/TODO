@@ -42,3 +42,5 @@ the next release:
 - "Transferring file..." message broken (doesn't display)
   due to filtering process, fix.
 - Change default permissions of settings.conf to 0600
+- Add tarball filesize to output
+- Add configuration for user/group owner of archive files, if ran as root
