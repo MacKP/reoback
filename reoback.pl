@@ -874,7 +874,7 @@ sub usage {
   print << "END_OF_INFO";
 
 REOBack Simple Backup Solution ver. $VERSION
-(c) 2001, Randy Oyarzabal (techno91\@users.sourceforge.net)
+(c) 2001, 2002 Randy Oyarzabal (techno91@users.sourceforge.net)
 
 Usage: reoback.pl [options] [<configfile>]
 
@@ -902,6 +902,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.16  2002/03/23 15:30:11  techno91
+# - Added 2002 in copyright info.
+#
 # Revision 1.15  2002/03/23 14:46:43  techno91
 # - Release number typo, changed release from 4 to 3.
 #
