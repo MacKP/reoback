@@ -38,11 +38,11 @@ use strict;
 # SET CONSTANTS
 ###########################################################################
 
-my $VERSION     = "1.0 Release 4";  # REOBack version number
+my $VERSION     = "1.0 Release 3";  # REOBack version number
 my $DATESTAMP   = `date +%Y%m%d`;   # Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`; # Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;   # Current time in format: 0945PM
-my $TARCMD      = "tar cpfz";       # Command to use to create tar files
+my $TARCMD      = "tar -cpzf";       # Command to use to create tar files
 my $NFSCMD      = "mount -o rw,soft,intr,wsize=8192,rsize=8192";
 my $EXT         = "\.tgz";          # Tar file extension
 
@@ -902,6 +902,12 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.15  2002/03/23 14:46:43  techno91
+# - Release number typo, changed release from 4 to 3.
+#
+# - Changed tar parameters from "cpfz" to "-cpzf" for compatability with
+#   other flavors of UNIX i.e. AIX.
+#
 # Revision 1.14  2002/03/23 03:28:12  griswold
 #
 #
