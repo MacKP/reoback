@@ -34,12 +34,11 @@
 ###########################################################################
 #
 use strict;
-use Net::FTP;
 
 # SET CONSTANTS
 ###########################################################################
 
-my $VERSION	= "1.0";
+my $VERSION	= "1.0 Release 2";
 my $DATESTAMP   = `date +%Y%m%d`;  #Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`;#Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;  #Current time in format: 0945PM
@@ -92,6 +91,9 @@ if ($config{"remotebackup"}){
          mkdir ($nfsPath, 0700);
       }
       print "done.\n\n";
+   }
+   else {
+     use Net::FTP;
    }
 }
 
@@ -864,6 +866,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.11  2001/08/20 20:05:40  techno91
+# - Added a check before using Net::FTP to prevent errors.
+#
 # Revision 1.10  2001/08/20 04:14:54  techno91
 # - Changed the version and add disclaimer in "sub usage".
 #
