@@ -569,7 +569,7 @@ sub backupMisc {
       # Check if we should skip this filename.
       if ( ( $btype ) and ( &excludeFile( $_ ) ) ) {
         # NOTE:  may not have to add to exclude, may just be able to skip
-        &addToExclude( $_, "$fileName.incl" );
+        &addToExclude( $_, "$fileName.excl" );
         $skipFile = 1;
       } else {
         &addToInclude( $_, "$fileName.incl" );
@@ -902,6 +902,10 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.18  2002/04/02 02:24:31  griswold
+#
+# - Fixed bug with exclude file name when excluding individual files.
+#
 # Revision 1.17  2002/03/24 01:23:14  techno91
 # - Added and escape for "@" in @user... in in the END_OF_INFO print lines.
 #
