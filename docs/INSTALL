@@ -50,19 +50,43 @@ located at "/etc/reoback-1.0/conf/"
 
 2. Edit the archive configuration file "conf/files.conf".  This is where 
    you define what files/dirs you want to backup.  An example is provided 
-   in the file.  A few things to remember:
+   in the file and also another example is listed here.  A few things to 
+   remember:
 
        a.  Comments always start with "#", as such, they are not part of 
            the backup.
  
-       b.  All keywords (currently only, "File:" and "Skip:") can be 
+       b.  Keywords:
+           "File:"  This defines a single archive.
+	   "Skip:"  This defines a directory to skip.
+ 
+       c.  All keywords (currently only, "File:" and "Skip:") can be 
            written in any case.
 
-       Keywords:
+       d.  Example:
+           File: Backup1
+           /etc
+           Skip: /etc/ted
+           /home/tom
+           /home/bill
 
-           "File:"  This defines a single archive.
+           File: NewsBackup
+           /var/www/html/news
 
-	   "Skip:"  This defines a directory to skip.
+           File: NewsArchiveBackup
+           /var/www/html/newsArch
+
+           # This is a comment :-)
+           # The above list will back up /etc recursively, but will skip
+           # the subdirectory /etc/ted
+           # It will also include /home/tom, and /home/bill in the tar
+           # file 'Backup1'
+
+           # The tar file 'NewsBackup' will contain '/var/www/html/news'
+           # and all subdirectories
+
+           # The tar file 'NewsArchiveBackup' will contain 
+           # '/var/www/html/newsArch' and all subdirectories
 
 
 ----------------------------------------------------------------------
