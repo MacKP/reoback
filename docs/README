@@ -15,17 +15,18 @@
 
 CONTENTS
 
-  1. What is REOBack?
-  2. Can I copy, modify, and/or distrubute it?
-  3. What files are included in the distribution and what are they for?
-  4. The backup process
-  5. Full / incremental backup difference
-  6. The restore process
-  7. Remote backups
-  8. How do I report bugs?
-  9. I have a great idea for REOBack, do you care?
- 10. Does REOBack have a mailing list?
- 11. Possible future enhancements
+  1.  What is REOBack?
+  2.  Can I copy, modify, and/or distribute it?
+  3.  What files are included in the distribution and what are they for?
+  4.  The backup process.
+  5.  What's with the filename?
+  6.  Full / incremental backup difference.
+  7.  The restore process.
+  8.  Remote backups.
+  9.  How do I report bugs?
+  10. I have a great idea for REOBack, do you care?
+  11. Does REOBack have a mailing list?
+  12. Possible future enhancements.
 
 ----------------------------------------------------------------------
 1. What is REOBack?
@@ -53,19 +54,22 @@ to be a simple, and is designed to be used by administrators and users alike.
 Enjoy!
 
 ----------------------------------------------------------------------
-2. Can I copy, modify, and/or distrubute it?
+2. Can I copy, modify, and/or distribute it?
 ----------------------------------------------------------------------
 
 You may copy and modify REOBack under the license terms of GNU GPL (See 
 LICENSE file).  All we ask is that you keep the header information 
 intact and contact us if you do so at: techno91@users.sourceforge.net.
 
-
 ----------------------------------------------------------------------
 3. What files are included in the distribution and what are they for?
 ----------------------------------------------------------------------
 
 As of version 1.0, REOBack consists of the following files:
+
+Note: RPM installs have different locations.
+
+TAR/GZIP INSTALL LOCATION:
 
 file: 	reoback.pl <------- Main program.
 
@@ -91,21 +95,12 @@ file:	status.dat <----------- Written after reoback run 1st time, keeps
 				track of history
 file:	archive.dat <---------- written after all files archived
 
-Parts of the archive filename:
 
-   DARKSTAR-mysite-full-20010818-1148AM.1.tgz     
-      /       |     |       |       |   \    \
-    /         |     |       |       |    \    \
-  (1)        (2)   (3)     (4)     (5)    (6) (7)
+RPM INSTALL LOCATION:
+docs: 	  /usr/share/doc/reoback-1.0/
+configs:  /etc/reoback-1.0/conf/
+program:  /usr/bin/
 
-   1 - Host identifier (defined in the configuration as "host")
-   2 - Backup identifier
-   3 - Type of backup (full or incremental)
-   4 - Date of backup (YYYYMMDD format)
-   5 - Time of backup
-   6 - Backup day (range: backupdays - (backupdays x 2)
-   7 - Extension (duh!)
-   
 ----------------------------------------------------------------------
 4. The backup process
 ----------------------------------------------------------------------
@@ -146,7 +141,26 @@ deletes the old backups.  That is because we don't want to delete the old
 backups until the next full backups are finished.
 
 ----------------------------------------------------------------------
-5. Full / incremental backup difference
+5.  What's with the filename?
+----------------------------------------------------------------------
+
+Parts of the archive filename:
+
+   DARKSTAR-mysite-full-20010818-1148AM.1.tgz     
+      /       |     |       |       |   \    \
+    /         |     |       |       |    \    \
+  (1)        (2)   (3)     (4)     (5)    (6) (7)
+
+   1 - Host identifier (defined in the configuration as "host")
+   2 - Backup identifier
+   3 - Type of backup (full or incremental)
+   4 - Date of backup (YYYYMMDD format)
+   5 - Time of backup
+   6 - Backup day (range: backupdays - (backupdays x 2)
+   7 - Extension (duh!)
+   
+----------------------------------------------------------------------
+6. Full / incremental backup difference.
 ----------------------------------------------------------------------
 
 When running a full backup, REOBack will archive ALL files and directories 
@@ -157,7 +171,7 @@ backup time, they will be picked up in every run until the next full
 backup time passes.
 
 ----------------------------------------------------------------------
-6. The restore process
+7. The restore process.
 ----------------------------------------------------------------------
 
 
@@ -183,7 +197,7 @@ isn't really hard to do.  To restore backups follow the following steps:
 You should now have an idea of how restores are performed.
 
 ----------------------------------------------------------------------
-7. Remote backups
+8. Remote backups.
 ----------------------------------------------------------------------
 
 Two types of remote backups are supported, NFS and FTP.  FTP has proven to 
@@ -197,7 +211,7 @@ configurations to NOT perform remote backups and simply keep local
 backups as NFS mount-points are simply represented as a local directory.
 
 ----------------------------------------------------------------------
-8. How do I report bugs?
+9. How do I report bugs?
 ----------------------------------------------------------------------
 
 Please use the bug tracking feature at sourceforge to report any 
@@ -205,7 +219,7 @@ bugs.  The URL is:
      http://sourceforge.net/projects/reoback/
 
 ----------------------------------------------------------------------
-9. I have a great idea for REOBack, do you care?
+10. I have a great idea for REOBack, do you care?
 ----------------------------------------------------------------------
 
 Of course we do!  Please send all ideas, suggestions, or comments to:
@@ -213,7 +227,7 @@ Of course we do!  Please send all ideas, suggestions, or comments to:
 
 
 ----------------------------------------------------------------------
-10. Does REOBack have a mailing list?
+11. Does REOBack have a mailing list?
 ----------------------------------------------------------------------
 
 Yes. The address is: reoback-discussion@lists.sourceforge.net
@@ -221,7 +235,7 @@ To subscribe/unsubscribe to list, visit our project page at
 http://sourceforge.net/projects/reoback/
 
 ----------------------------------------------------------------------
-10. Possible future enhancements
+12. Possible future enhancements.
 ----------------------------------------------------------------------
 
    - Web configuration interface
