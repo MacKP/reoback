@@ -1,0 +1,25 @@
+############################################################################
+# REOBack - MANUALS
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold (griswold@users.sourceforge.net)
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+############################################################################
+
+REOBack does not have an english manual yet.  The README and INSTALL ought 
+to be sufficient to get REOBack up and running for now.
+
+However a spanish speaking REOBack user, Luis Miguel Cruz created a very 
+nice manual in spanish.  It is well formatted and available in different 
+formats (PDF, HTML etc.)
+
+
+English:	none yet.
+Spanish:	http://www.flcnet.es/tbe/luismi/Documentos/reoback.htm

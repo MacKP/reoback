@@ -1,0 +1,37 @@
+############################################################################
+# REOBack - TODO
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold (griswold@users.sourceforge.net)
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+############################################################################
+
+The following is a list of TODOs that we are hoping to implement before 
+the next release:
+
+- Change text in the title: "Performing backup via ...(FTP or NFS).  
+  Add "Local"
+- Confusion on backupdays variable
+- Atomic full backups.
+- Delete all temp files before run.
+- Conditional load of modules.
+
+Document requirements: 
+     perl -MCPAN -e 'install Net::FTP'
+
+- Conditional load of modules
+
+- backup reset
+- Create any dirs. that doesn't exist.
+- Supress tar output from STDOUT
+- Log file creation
+- Mail notifications
+- Command line parameters
+- Update man pages and documentation

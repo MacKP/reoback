@@ -9,10 +9,16 @@
 # Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
 #
 # Other developers and contributors:
-#    Richard Griswold
+#    Richard Griswold (griswold@users.sourceforge.net)
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
 #
 ############################################################################
+
+List of changes made so far before next release (11/14/2001):
+
+- Fixed problem when backing up "/" (root).
+- Fixed "rename" code to use "move" to work across filesystems.
+- Fixed the directory permissions problem when restoring backups.
 
 
 August 20 2001: Version 1.0 Release 2
