@@ -30,4 +30,15 @@ the next release:
 - Add support for SMB mounting, similar to NFS mounting
 - Add option to backup subdirectories in separate archives
 - Add configuration to change archive names
-- Change message of deletions to specify what numbers were removed.
+- Change message of deletions to specify what numbers were removed
+- Remove default message of transer time if not doing remote backups
+- Add config for absolute path of tar, date and other dependent 
+  executables.
+- Fix RPM package to set correct default values for run_reoback.sh, and 
+  settings.conf
+- Implement file locking to prevent multiple instances from overwriting 
+  each others files.
+- Implement perl regular expressions for file inclusions
+- "Transferring file..." message broken (doesn't display)
+  due to filtering process, fix.
+- Change default permissions of settings.conf to 0600
