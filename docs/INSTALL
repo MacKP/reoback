@@ -1,6 +1,17 @@
-ReoBack: Backup Program for Linux
-     - INSTALL
-=================================
+############################################################################
+# REOBack - INSTALL
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+############################################################################
 
 Edit conf/files.conf to list the names of the backup tar files to be 
 created, as well as listing the files that should be included or skipped 

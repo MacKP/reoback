@@ -56,7 +56,8 @@ Enjoy!
 
 You may copy and modify, but if you also distribute please let us know and 
 also include this comment in your changes:
-original file was included in 'ReoBack' - http://reoback.sourceforge.net"
+this original file was included in 'ReoBack' distribution - 
+http://reoback.sourceforge.net
 
 
 ----------------------------------------------------------------------
@@ -67,25 +68,27 @@ As of version 1.0, REOBack consists of the following files:
 
 file: 	reoback.pl <------- Main program.
 
-file:	run_reoback.sh <--- Shell script to run main program.  Created
-			    mainly for cron execution.
+file:	run_reoback.sh <--- 	Shell script to run main program.  Created
+			    	mainly for cron execution.
 
-dir:	docs <------------- Documentation etc.
-     'docs/README' - this file
-     'docs/INSTALL' - what you need to do to install and start using
-     'docs/CHANGES' - lists changes with each released version
-     'docs/LICENSE' - the GNU public license
-
-
-dir:	conf <------------- Configuration files.
-     'conf/settings.conf' - configuration file
-     'conf/files.conf' - configuration file
+dir:	docs <----------------- Documentation etc.
+file:	docs/README <---------- This file
+file:	docs/INSTALL <---------	What you need to do to install and start 
+				using
+file:	docs/CHANGES <---------	Lists changes with each released version
+file:	docs/LICENSE <---------	The GNU public license
 
 
-dir:    data <------------- Directory to keep data files to keep track of
-			    what type of backup to run.
-status.dat - written after reoback run 1st time, keeps track of history
-archive.dat - written after all files archived
+dir:	conf <----------------- Configuration files.
+file:	conf/settings.conf <---	Configuration file
+file:	conf/files.conf <------ Configuration file
+
+
+dir:    data <----------------- Directory to keep data files to keep 
+				track of what type of backup to run.
+file:	status.dat <----------- Written after reoback run 1st time, keeps 
+				track of history
+file:	archive.dat <---------- written after all files archived
 
 Parts of the archive filename:
 
@@ -205,7 +208,7 @@ bugs.  The URL is:
 ----------------------------------------------------------------------
 
 Of course we do!  Please send all ideas, suggestions, or comments to:
-     techno@penguinsoup.org
+     techno91@users.sourceforge.net
 
 ----------------------------------------------------------------------
 10. Possible future enhancements

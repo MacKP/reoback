@@ -1,0 +1,36 @@
+############################################################################
+# REOBack - CHANGES
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal 
+(techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+############################################################################
+
+August 2001: Version 1.1
+=================================
+
+- Configuration file is now passed as a parameter to reoback.pl.  This way
+  it can be used dynamically by many users on one system.
+
+- Added functionality to define individual archives by defining them
+  in a central location. i.e. files.cfg.  See documentation on formatting.
+
+- Depreciated support for individual MySQL and PostGreSQL backups.  All
+  backups are now defined in a user supplied file like "files.cfg".
+
+- Allowed for a more flexible and simpler backup files list
+
+- Required use of parameter on the main program file (for future use)
+
+August 2001: Version 1.0
+=================================
+First Release
+
