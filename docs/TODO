@@ -29,3 +29,5 @@ the next release:
 - Follow Mandrake's file locations (found in the mandrake rpms)
 - Add support for SMB mounting, similar to NFS mounting
 - Add option to backup subdirectories in separate archives
+- Add configuration to change archive names
+- Change message of deletions to specify what numbers were removed.

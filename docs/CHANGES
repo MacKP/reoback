@@ -14,17 +14,75 @@
 #
 ############################################################################
 
-List of changes made so far before next release (11/14/2001):
 
-- Fixed problem when backing up "/" (root).
+March 23 2002: Version 1.0 Release 3
+=================================
+
+- Fixed problem when backing up "/" (root dir).
+
 - Fixed "rename" code to use "move" to work across filesystems.
+
 - Fixed the directory permissions problem when restoring backups.
+
+- Changed tar parameters from "cpfz" to "-cpzf" for compatability with 
+  other flavors of UNIX i.e. AIX.
+
+- Check if Net::FTP is installed when doing an FTP remote backup,
+  * Fixes bug 463642
+
+- Automatically create directories from settings.conf if they do not
+  exist.  Parent directories are created if necessary.
+  * First half of fix for bug 482380
+
+- Better error checking and reporting.
+  * Second half of fix for bug 482380
+
+- Removes large (>2GB) archives, even if Perl does not have large file
+  support.  This relies on the tar command having large file support
+  enabled, but both the file system and the tar command have to have
+  large file support to create a file larger than 2GB.
+  * Fixes bug 521843
+
+- Skip removing comments for FTP passwords.  REOBack will now treat
+  everything after 'ftppasswd = ' as a password, except for leading and
+  trailing whitespace.  For example, for the line
+  'ftppasswd   =   my##password   ', REOBack will extract 'my##password'
+  as the FTP password.
+  * Fixes bug 506178
+
+- Correctly handle the case where there are no files to skip.
+
+- Fixed a bug with checking for the last modification time for symbolic
+  links.
+
+- Perl regular expressions (wild cards) for Skip: directives.  For
+  example, to skip all files and directories in your home directory that
+  start with a dot, you can use:
+
+    Skip: /home/myself/\..*
+
+  Wondering what '\..*' does?  The leading backslash, '/', tells REOBack
+  (actually Perl) to treat the next dot, '.', as a literal dot.  The
+  third dot tells Perl to match any character, and the asterisk, '*',
+  tells Perl to perform the match zero or more times.
+
+- Suppress "Removing leading `/'" message from tar.
+
+- Prints correct backup type.
+
+- Prints version each time it is run.
+
+- Creates fewer temporary files.
+
+- General code streamlining and cleanup.
+
 
 
 August 20 2001: Version 1.0 Release 2
 =================================
 
 - Added a check before using Net::FTP to prevent errors.
+
 
 
 August 19 2001: Version 1.0
