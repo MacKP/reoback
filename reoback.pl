@@ -39,7 +39,7 @@ use Net::FTP;
 # SET CONSTANTS
 ###########################################################################
 
-my $VERSION	= "1.0 RC2";
+my $VERSION	= "1.0";
 my $DATESTAMP   = `date +%Y%m%d`;  #Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`;#Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;  #Current time in format: 0945PM
@@ -846,6 +846,15 @@ Options:
 
 See http://sourceforge.net/projects/reoback/ for project info.
 
+This program is distributed in the hope that it will be useful, but 
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public  
+License for more details.
+
+You should have received a copy of the GNU General Public License along  
+with this program; if not, write to the Free Software Foundation, Inc., 59  
+Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
 END_OF_INFO
 }
 
@@ -855,6 +864,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.10  2001/08/20 04:14:54  techno91
+# - Changed the version and add disclaimer in "sub usage".
+#
 # Revision 1.9  2001/08/20 02:30:55  techno91
 # - Fixed some typos in preparation for 1st release.
 #
