@@ -1,0 +1,38 @@
+ReoBack: Backup Program for Linux
+     - README
+=================================
+
+CONTENTS
+  1. What is ReoBack?
+  2. What files are included in the distribution and what are they for?
+  3. How do I report bugs?
+  4. I have a great idea for ReoBack, do you care?
+
+
+1. WHAT IS REOBACK?
+
+ReoBack is a xxxxxx.  For the latest information, check out the web site:
+     http://reoback.sourceforge.net/
+
+
+2. WHAT FILES ARE INCLUDED IN THE DISTRIBUTION AND WHAT ARE THEY FOR?
+     'reoback.pl' - the main application
+     'conf/settings.conf' - configuration file
+     'conf/files.conf' - configuration file
+     'docs/README' - this file
+     'docs/INSTALL' - what you need to do to install and start using
+     'docs/CHANGES' - lists changes with each released version
+     'docs/LICENSE' - the GNU public license
+
+
+3. HOW DO I REPORT BUGS?
+
+Please use the bug tracking feature at sourceforge to report any 
+bugs.  The URL is:
+     http://reoback.sourceforge.net/
+
+
+4. I HAVE A GREAT IDEA FOR REOBACK, DO YOU CARE?
+
+Of course we do!  Please send all ideas, suggestions, or comments to:
+     techno@penguinsoup.org
