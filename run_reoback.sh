@@ -1,7 +1,18 @@
 #!/bin/sh
 ############################################################################
+# REOBack - run_reoback.sh
 # $Id$
 ############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+#
 # This script is provided to conveniently run REOBack with one command
 # or for use in a "crontab" when scheduling nightly backups.
 #

@@ -1,9 +1,10 @@
 #!/usr/bin/perl -w
 ############################################################################
+# REOBack - reoback.pl
 # $Id$
 ############################################################################
 #
-# REOBack Simple Backup Solution 
+# REOBack Simple Backup Solution
 # http://sourceforge.net/projects/reoback/
 #
 # Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
@@ -31,6 +32,7 @@
 #             NO USER SERVICABLE PARTS BEYOND THIS POINT!
 #
 ###########################################################################
+#
 use strict;
 use Net::FTP;
 
@@ -853,6 +855,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.9  2001/08/20 02:30:55  techno91
+# - Fixed some typos in preparation for 1st release.
+#
 # Revision 1.8  2001/08/18 18:58:57  techno91
 # - Edited copyright notice headers.
 #
