@@ -6,7 +6,7 @@
 # REOBack Simple Backup Solution
 # http://sourceforge.net/projects/reoback/
 #
-# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91@users.sourceforge.net)
 #
 # Other developers and contributors:
 #    Richard Griswold (griswold@users.sourceforge.net)
@@ -16,24 +16,16 @@
 The following is a list of TODOs that we are hoping to implement before 
 the next release:
 
-- Change text in the title: "Performing backup via ...(FTP or NFS).  
-  Add "Local"
 - Confusion on backupdays variable
 - Atomic full backups.
 - Delete all temp files before run.
-- Conditional load of modules.
-
-Document requirements: 
-     perl -MCPAN -e 'install Net::FTP'
-
-- Conditional load of modules
-- backup reset (pass parameter to remove *.dat files)
-- Create any dirs. that doesn't exist.
+- Backup reset (pass parameter to remove *.dat files)
 - Supress tar output from STDOUT
 - Log file creation
 - Mail notifications
-- Command line parameters
+- Command line parameters to specify files/directories to backup
 - Update man pages and documentation
 - Read the /etc/reoback/settings.conf by default
 - Follow Mandrake's file locations (found in the mandrake rpms)
-
+- Add support for SMB mounting, similar to NFS mounting
+- Add option to backup subdirectories in separate archives
