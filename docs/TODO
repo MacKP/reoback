@@ -44,3 +44,4 @@ the next release:
 - Change default permissions of settings.conf to 0600
 - Add tarball filesize to output
 - Add configuration for user/group owner of archive files, if ran as root
+- Add configuration for FTP passive mode support (see forum suggestion)
