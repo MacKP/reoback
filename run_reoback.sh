@@ -24,7 +24,7 @@
 #
 # 2. Add the following line if you want to run the backups every
 #    1:45 AM.  Change the time and path where necesary.
-#    45 1 * * * /usr/reoback/run_reoback.sh
+#    45 1 * * * root /usr/reoback/run_reoback.sh
 #
 # 3. Make sure the path definitions below are correct.
 #
