@@ -11,9 +11,17 @@
 # Other developers and contributors:
 #    Richard Griswold
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+#
 ############################################################################
 
-August 2001: Version 1.0
+
+August 20 2001: Version 1.0 Release 2
+=================================
+
+- Added a check before using Net::FTP to prevent errors.
+
+
+August 19 2001: Version 1.0
 =================================
 
 - Initial public release.
