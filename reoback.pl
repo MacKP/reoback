@@ -63,6 +63,7 @@ my $remotePath;	# Remote path for archives.
 my $nfsPath;	# NFS path for archives.
 my $ftp;        # Object for FTP connection.
 my @skipDirs;	# Global for directories to skip per archive.
+my $foundFiles; # Global for determining if files are found for backup.
 
 # Determine what type of backup to perform
 &backupType;
@@ -178,7 +179,7 @@ sub backupDir{
         }
 
         # Remove temporary file
-          unlink ($_);
+        unlink ($_);
       }
    }
 }
@@ -248,9 +249,12 @@ sub archiveFile{
      my $tmpName = $_[2];       # List of files or file to archive.
      my $file = $_[3];		# File name by itself.
 
+     my $readfrom = $tmpName;
+     $readfrom =~ s/\.list$/\.tmp/;
+
      # Create the tar archive
      if ($archType){
-        system("$TARCMD $fileName -T $tmpName");
+        system("$TARCMD $fileName -T $readfrom -X $tmpName");
      }
      else {
         system($TARCMD." ".$fileName." ".$tmpName);
@@ -284,18 +288,18 @@ sub transferFile{
         # Transfer tar file to remote location
         $ftp->put($fullPath) or $errFlag = 1;
         $ftp->quit;
-     } 
+     }
      else {
         copy($fullPath,$nfsPath.$fileName) or $errFlag = 1;
      }
      $endTime = time() - $startTime;
      $xferTime = $xferTime + $endTime;
      if ($errFlag) {
-        print "FAILED! : $!\n\n";     
+        print "FAILED! : $!\n\n";
      }
-     else {     
+     else {
         print "done.\n\n";
-     }     
+     }
 }
 
 # Description:  Routine for recursively traversing a directory
@@ -316,14 +320,16 @@ sub scanDir{
   my $fileList = $_[4]; # List of file names
   my $fileName = $_[5]; # Filename of file that contains list of files to tar
   my $name;             # Name of an entry in current directory
+  my $fname;            # Fully qualified name of an entry in current directory
   my @dirs;             # List of directories in this directory
   my $tmp;              # Temporary variable for full file path
   my $lastmod;          # Last modified date
   my $top;              # Non-zero if top of recursive calls
-  my $count = 0;
-  my $skipDir;
-  my $skipFlag = 0;
+  my $skipFlag = 0;     # Non-zero if we are skipping a file
   my $checkDir;         # Check this name against array of directories to skip
+  my $haveFile = 0;     # Non-zero if we are backing up a file in this dir
+  my $subHaveFile = 0;  # Non-zero directory has a file
+  my $rc;               # Return code
 
   if ( not $fileName ) {
     $fileName = $bname;
@@ -333,37 +339,52 @@ sub scanDir{
   # Check all entries in this directory
   opendir RT, $curdir or die "opendir \"$curdir\": $!\n";
   while ( $name = readdir RT ) {
-    $count++;
-    if ( ( $name ne "\." ) and ( $name ne "\.\." )  # Ignore . and ..
-        and ( -d $curdir."/".$name )                # Is this a directory?
-        and ( not -l $curdir."/".$name ) ) {        # And not a symlink?
+    # Ignore this filename if it is '.' or '..'.
+    if ( ( $name eq "\." ) or ( $name eq "\.\." ) ) {
+      next;
+    }
 
-      # Remove redundant slashes from the name of this directory.
-      $checkDir = $curdir."/".$name;
-      $checkDir =~ s/\/+\//\//g; # Added to remove extra "/" if backing up "/"
+    # Fully qualify the filenamename, and remove redundant slashes.
+    $fname = $curdir."/".$name;
+    $fname =~ s/\/+\//\//g; # Added to remove extra "/" if backing up "/"
 
-      # Loop through global array of directories to skip.
-      foreach $skipDir (@skipDirs) {
-         if ($checkDir eq $skipDir) {
-            $skipFlag = 1;
-         }
+    # Check if we should skip this filename.
+    foreach ( @skipDirs ) {
+      if ( $fname eq $_ ) {
+        &addToExclude( $fname, $fileName, $fileList );
+        $skipFlag = 1;
+        last;
       }
-      if ( !$skipFlag ){
-        push @dirs, $name;
-      }
-      # Re-initialize skip flag.
+    }
+    if ( $skipFlag ) {
+      # Reset skip flag
       $skipFlag = 0;
-    } elsif ( ( -f $curdir."/".$name ) or ( -l $curdir."/".$name ) ) {
-      # File processing here...
-      &addToFile( $curdir."/".$name, $fileName, $btype, $fileList, $subdirs );
+    }
+
+    # If this filename is a directory, add it to the list of directories.
+    elsif ( ( -d $fname ) and ( not -l $fname ) ) {
+      # Don't push the fully qualified name
+      push @dirs, $name;
+    }
+
+    # If this filename is a file or symlink, check if it should be excluded
+    # from an incremental backup.
+    elsif ( ( -f $fname ) or ( -l $fname ) ) {
+      if ( ( $btype ) and ( &excludeFile( $fname ) ) ) {
+        &addToExclude( $fname, $fileName, $fileList );
+      } else {
+        $haveFile = 1;
+	$foundFiles = 1;
+      }
+    }
+
+    # Exclude anything else.
+    else {
+      &addToExclude( $fname, $fileName, $fileList );
     }
   }
-  closedir RT;
 
-  # Back up this directory if it is empty
-  if ($count == 2){
-    &addToFile( $curdir, $fileName, $btype, $fileList, $subdirs );
-  }
+  closedir RT;
 
   # Recursively call this function on each directory in this directory
   foreach ( @dirs ) {
@@ -374,13 +395,34 @@ sub scanDir{
       }
       $fileName = $bname.".".$_;
     }
-    &scanDir( $curdir."/".$_, $bname, $btype, $subdirs, $fileList, $fileName );
+    $rc = &scanDir( $curdir."/".$_, $bname, $btype, $subdirs, $fileList,
+      $fileName );
+
+    # Exclude sub directory if it doesn't have any files to back up
+    if ( ( $rc == 0 ) and ( $btype ) ) {
+      &addToExclude( $curdir."/".$_, $fileName, $fileList );
+    } else {
+      $subHaveFile = 1;
+    }
+  }
+
+  # If this directory is new since last full backup, indicate we have files
+  # even if we don't
+  if ( ( $btype ) and ( not &excludeFile( $curdir ) ) ) {
+    $haveFile = 1;
+    $foundFiles = 1;
   }
 
   # Close last directory list before exiting
-  if ( $top and ( fileno DIRLIST ) ) {
-    close DIRLIST;
+  if ( $top ) {
+    if ( $subHaveFile+$haveFile == 0 ) {
+      &addToExclude( $curdir, $fileName, $fileList );
+    }
+    if ( fileno DIRLIST ) { close DIRLIST; }
   }
+
+  # Return non-zero if we or our sub dirs have a file to back up
+  return $subHaveFile+$haveFile;
 }
 
 # Description:  Routine for parsing the configuration file into
@@ -443,7 +485,7 @@ sub backupType
         # Key:
         # 0 = Backup counter, 1 = Last full backup
     my $lTime;          # Temporary variable for time conversion.
-    
+
     # Prepare date and time stamps
     chomp($DATESTAMP);
     chomp($DATESTAMPD);
@@ -550,7 +592,7 @@ sub processFiles {
         else {
            print ARCHFILE "$_\n";
         }
-     }         
+     }
   }
   if ( fileno SKIPFILE ) {
      close SKIPFILE;
@@ -564,11 +606,11 @@ sub processFiles {
      my $fullArchFile = $config{"tmpdir"}.$_.$tmpExt;
      if ( -e $fullSkipFile ){
         open (SKIPDIRS, "<$fullSkipFile");
-        @skipDirs = <SKIPDIRS>; 
+        @skipDirs = <SKIPDIRS>;
         chomp(@skipDirs);
         # Remove temporary file
         unlink ( $fullSkipFile );
-     }    
+     }
      backupMisc($_, $fullArchFile);
 
      # Remove temporary file
@@ -588,6 +630,8 @@ sub backupMisc {
   my $fullPath;
   my $bName = $_[0];
   my $misc = $_[1];
+
+  $foundFiles = 0; #Reset for each archive.
 
   print "  Working on $bName...\n";
 
@@ -628,7 +672,9 @@ sub backupMisc {
   close FILE;
   close DIRLIST;
 
-  if ( $gotfiles ) {
+#  if ( $gotfiles ) {   # Commenting this line because of new way of backups to preserve
+			# permissions.
+  if ( $foundFiles ) {
     $tarName = $config{"host"}."-".$bName."-".$backupType."-".
         $DATESTAMP."-".$TIMESTAMP."\.".$bCounter.$EXT;
 
@@ -657,6 +703,49 @@ sub backupMisc {
   unlink ( $fileName );
 }
 
+# Description:  Routine to check if a file should be excluded from an
+#               incremental backup.
+# Parameter(s): "file to check"
+# Returns:      0 if file should not be excluded.
+#               1 if file should be excluded.
+sub excludeFile {
+  my $file     = $_[0]; # File to check
+  my $lastmod;          # Last modified date
+
+  $lastmod = ( stat( $file ) )[10];
+  if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
+    # File was modified since last full backup.  Do not exclude it.
+    return 0;
+  }
+  # File was not modified since last full backup so exclude it.
+  return 1;
+}
+
+# Description:  Routine to add a filename to a file that lists all
+#               files to exclude from a backup.
+# Parameter(s): "name of file to add",
+#               "name of file to write to",
+#               "list ref to return exclude file names in"
+# Returns:      Nothing.
+sub addToExclude {
+  my $file     = $_[0]; # File to check
+  my $fileName = $_[1]; # Filename to write files to
+  my $fileList = $_[2]; # List of file names
+
+  # Open exclude file if it isn't already open, and push the name on
+  # the list of exclude file names.
+  if ( not fileno DIRLIST ) {
+    push @{ $fileList }, $fileName;
+    open DIRLIST, ">>$fileName" or die "open \"$fileName\": $!\n";
+  }
+
+  # Collapse multiple slashes into one before writting file name to file
+  $file =~ s/\/+\//\//g;
+
+  # Write the name of the file to exclude.
+  print DIRLIST "$file\n";
+}
+
 # Description:  Routine to check if a file should be included in
 #               the backup.  Writes the file (or directory) name to
 #               a file to be used by tar later on.
@@ -674,20 +763,19 @@ sub addToFile {
   my $fullPath;
 
   if ($subdirs) {
-     $fullPath = $config{"tmpdir"}.$fileName;		
+     $fullPath = $config{"tmpdir"}.$fileName;
   }
   else {
-     $fullPath = $fileName;	
+     $fullPath = $fileName;
   }
-  
-  
+
   if ( ( $file ne "\." ) and ( $file ne "\.\." ) ) {  # Ignore . and ..
     if ($btype){
       $lastmod = ( stat( $file ) )[10];
       if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
         if ( not fileno DIRLIST ) {
           push @{ $fileList }, $fileName;
-          
+
           open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
         }
         # Collapse multiple slashes into one before writting file name to file
@@ -717,7 +805,7 @@ sub recordArchive{
    }
    else {
       print ARCHIVES $bCounter.",".$localPath.",".$config{"localmount"}.$DATESTAMPD."\/".",".$file."\n";
-   }   
+   }
    close ARCHIVES;
 }
 
@@ -797,17 +885,17 @@ sub processDeletions{
          $file = $record[3];
 
          if ( ( $buNum >= $lower ) and ( $buNum <= $upper ) ) {
-      
+
             # Delete local backup.
             if ($config{"keeplocalcopy"}){
-               unlink ($ldir.$file) or 
+               unlink ($ldir.$file) or
                   warn ("    Unable to delete local file! : $!\n");
                rmdir ($ldir);
             }
 
             # Delete from remote host.
             if ($config{"remotebackup"}){
-               if ($config{"rbackuptype"} eq "FTP"){	    
+               if ($config{"rbackuptype"} eq "FTP"){
                   $ftp->cwd($rdir) or
                      warn ("    Unable to change to remote directory! : $!\n");
                   $ftp->delete($file) or
@@ -816,10 +904,10 @@ sub processDeletions{
 	       }
 	       else {
 	          unlink ($rdir.$file) or
-                     warn ("    Unable to delete remote file! : $!\n");		  
+                     warn ("    Unable to delete remote file! : $!\n");
 		  rmdir ($rdir);
 	       }
-	      
+
             }
          }
          else {
@@ -830,7 +918,7 @@ sub processDeletions{
       close TMPFILE;
 
       unlink($archFiles) or die ("    Unable to delete $archFiles!: $!\n");
-      rename($tmpFile, $archFiles) or die ("    Unable to rename
+      move($tmpFile, $archFiles) or die ("    Unable to rename
          $tmpFile to $archFiles!: $!\n");
 
       # Close connection if necessary
@@ -848,7 +936,7 @@ sub version {
 sub usage {
   print << "END_OF_INFO";
 
-REOBack Simple Backup Solution ver. $VERSION 
+REOBack Simple Backup Solution ver. $VERSION
 (c) 2001, Randy Oyarzabal (techno91\@users.sourceforge.net)
 
 Usage: reoback.pl [options] [<configfile>]
@@ -859,24 +947,31 @@ Options:
 
 See http://sourceforge.net/projects/reoback/ for project info.
 
-This program is distributed in the hope that it will be useful, but 
-WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public  
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
 License for more details.
 
-You should have received a copy of the GNU General Public License along  
-with this program; if not, write to the Free Software Foundation, Inc., 59  
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc., 59
 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 END_OF_INFO
 }
 
 
-###############################################################################
+##############################################################################
 # $Id$
 ###############################################################################
 #
 # $Log$
+# Revision 1.13  2001/11/15 03:49:41  techno91
+# - Major bug fix.  Richard applied a fix to preserve directory permissions
+#   upon restore by changing the algorithm of tar to take an exclude file.
+#
+# - I made some changes to prevent creating emty archives upon incremental
+#   backups by adding a global boolean $foundFiles.
+#
 # Revision 1.12  2001/08/24 03:09:22  techno91
 # - Richard applied a fix to properly process "Skip:" definitions
 #   when backing up the root directory ("/").
