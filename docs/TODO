@@ -17,10 +17,11 @@ The following is a list of TODOs that we are hoping to implement before
 the next release:
 
 - Confusion on backupdays variable
-- Atomic full backups.
+- Atomic full backups.  Backup should only be considered successful if the script
+  ran completey.
 - Delete all temp files before run.
-- Backup reset (pass parameter to remove *.dat files)
-- Supress tar output from STDOUT
+- Commandline backup reset (pass parameter to remove *.dat files)
+- Supress tar output from STDOUT (done)
 - Log file creation
 - Mail notifications
 - Command line parameters to specify files/directories to backup
@@ -45,3 +46,6 @@ the next release:
 - Add tarball filesize to output
 - Add configuration for user/group owner of archive files, if ran as root
 - Add configuration for FTP passive mode support (see forum suggestion)
+- Add SCP support.  A patch (passwordless SCP) is available in the mailing list 
+  archive.  Need to change this to also support user/password authenticated transfers.
+- Commandline support to force full backups on every run.
