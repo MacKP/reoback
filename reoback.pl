@@ -622,7 +622,8 @@ sub excludeFile {
   my $file     = $_[0]; # File to check
   my $lastmod;          # Last modified date
 
-  $lastmod = ( lstat( $file ) )[10];
+  # Get last modify time for the file (or symlink)
+  $lastmod = ( lstat( $file ) )[9];
   if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
     # File was modified since last full backup.  Do not exclude it.
     return 0;
@@ -902,6 +903,12 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.19  2002/04/02 05:50:11  griswold
+#
+# - Check the mtime field (field 9) from lstat instead of the ctime field
+#   (field 10), since ctime doesn't seem to be set correctly on SMB mounted
+#   filesystems.
+#
 # Revision 1.18  2002/04/02 02:24:31  griswold
 #
 # - Fixed bug with exclude file name when excluding individual files.
