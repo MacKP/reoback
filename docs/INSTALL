@@ -13,10 +13,82 @@
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
 ############################################################################
 
-Edit conf/files.conf to list the names of the backup tar files to be 
-created, as well as listing the files that should be included or skipped 
-during the backup process.
+CONTENTS
 
-Edit conf/settings.conf
+  I.  	Unpacking tar/gzip sources
+  II. 	Installing the RPM package
+  III.	Configuration
+  IV.	Running the program
+
+----------------------------------------------------------------------
+I. Unpacking tar/gzip sources.
+----------------------------------------------------------------------
+
+You can unpack the tar/gzip file with the following command:
+
+   tar xvf reoback-1.0.tar.gz
+
+
+----------------------------------------------------------------------
+II. Installing the RPM package
+----------------------------------------------------------------------
+
+To install the RPM, simply type:
+
+   rpm -ivh reoback-1.0-1.i386.rpm
+
+
+----------------------------------------------------------------------
+III. Configuration
+----------------------------------------------------------------------
+
+NOTE: If you installed using the RPM package, all configuration files are 
+located at "/etc/reoback-1.0/conf/"
+
+1. Edit the main configuration file "conf/settings.conf".  Each variable
+   is explained in the file.
+
+2. Edit the archive configuration file "conf/files.conf".  This is where 
+   you define what files/dirs you want to backup.  An example is provided 
+   in the file.  A few things to remember:
+
+       a.  Comments always start with "#", as such, they are not part of 
+           the backup.
+ 
+       b.  All keywords (currently only, "File:" and "Skip:") can be 
+           written in any case.
+
+       Keywords:
+
+           "File:"  This defines a single archive.
+
+	   "Skip:"  This defines a directory to skip.
+
+
+----------------------------------------------------------------------
+IV. Running the program
+----------------------------------------------------------------------
+
+To run REOBack, simply type:
+
+   reoback.pl <configfile>
+
+Where <configfile> is the full path of "settings.cfg".
+
+For convenience, a file named "run_reoback.sh" is provided to run the 
+program with one command.  It is recommended that you use this file if you 
+plan on scheduling REOBack via cron.
+
+For more information, please see the "README" file.  If you installed 
+using RPM, the documention is located at /usr/share/docs/reoback-1.0/ and 
+a man page is included and can be access by either:
+
+   man reoback or man reoback.pl
+
+Please report any comments, questions or bugs at the project website at: 
+
+http://sourceforge.net/projects/reoback/
+
+Enjoy!
 
 

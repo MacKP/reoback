@@ -14,19 +14,21 @@
 ############################################################################
 
 CONTENTS
-  1. What is ReoBack?
+
+  1. What is REOBack?
   2. Can I copy, modify, and/or distrubute it?
   3. What files are included in the distribution and what are they for?
   4. The backup process
-  5. Full / incremental difference
+  5. Full / incremental backup difference
   6. The restore process
   7. Remote backups
   8. How do I report bugs?
-  9. I have a great idea for ReoBack, do you care?
- 10. Possible future enhancements
+  9. I have a great idea for REOBack, do you care?
+ 10. Does REOBack have a mailing list?
+ 11. Possible future enhancements
 
 ----------------------------------------------------------------------
-1. What is ReoBack?
+1. What is REOBack?
 ----------------------------------------------------------------------
 
 In the many years that I've been using computers, backups were the one 
@@ -54,10 +56,9 @@ Enjoy!
 2. Can I copy, modify, and/or distrubute it?
 ----------------------------------------------------------------------
 
-You may copy and modify, but if you also distribute please let us know and 
-also include this comment in your changes:
-this original file was included in 'ReoBack' distribution - 
-http://reoback.sourceforge.net
+You may copy and modify REOBack under the license terms of GNU GPL (See 
+LICENSE file).  All we ask is that you keep the header information 
+intact and contact us if you do so at: techno91@users.sourceforge.net.
 
 
 ----------------------------------------------------------------------
@@ -145,7 +146,7 @@ deletes the old backups.  That is because we don't want to delete the old
 backups until the next full backups are finished.
 
 ----------------------------------------------------------------------
-5. Full / incremental difference
+5. Full / incremental backup difference
 ----------------------------------------------------------------------
 
 When running a full backup, REOBack will archive ALL files and directories 
@@ -204,11 +205,20 @@ bugs.  The URL is:
      http://sourceforge.net/projects/reoback/
 
 ----------------------------------------------------------------------
-9. I have a great idea for ReoBack, do you care?
+9. I have a great idea for REOBack, do you care?
 ----------------------------------------------------------------------
 
 Of course we do!  Please send all ideas, suggestions, or comments to:
      techno91@users.sourceforge.net
+
+
+----------------------------------------------------------------------
+10. Does REOBack have a mailing list?
+----------------------------------------------------------------------
+
+Yes. The address is: reoback-discussion@lists.sourceforge.net
+To subscribe/unsubscribe to list, visit our project page at 
+http://sourceforge.net/projects/reoback/
 
 ----------------------------------------------------------------------
 10. Possible future enhancements
