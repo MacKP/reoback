@@ -323,6 +323,7 @@ sub scanDir{
   my $count = 0;
   my $skipDir;
   my $skipFlag = 0;
+  my $checkDir;         # Check this name against array of directories to skip
 
   if ( not $fileName ) {
     $fileName = $bname;
@@ -337,9 +338,13 @@ sub scanDir{
         and ( -d $curdir."/".$name )                # Is this a directory?
         and ( not -l $curdir."/".$name ) ) {        # And not a symlink?
 
+      # Remove redundant slashes from the name of this directory.
+      $checkDir = $curdir."/".$name;
+      $checkDir =~ s/\/+\//\//g; # Added to remove extra "/" if backing up "/"
+
       # Loop through global array of directories to skip.
       foreach $skipDir (@skipDirs) {
-         if ($curdir."/".$name eq $skipDir) {
+         if ($checkDir eq $skipDir) {
             $skipFlag = 1;
          }
       }
@@ -613,6 +618,8 @@ sub backupMisc {
             die "open \"$fileName\": $!\n";
           $gotfiles = 1;
         }
+        # Collapse multiple slashes into one before writting file name to file
+        $_ =~ s/\/+\//\//g;
         print DIRLIST "$_\n";
       }
     }
@@ -683,6 +690,8 @@ sub addToFile {
           
           open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
         }
+        # Collapse multiple slashes into one before writting file name to file
+        $file =~ s/\/+\//\//g;
         print DIRLIST "$file\n";
       }
     } else {
@@ -690,6 +699,8 @@ sub addToFile {
         push @{ $fileList }, $fileName;
         open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
       }
+      # Collapse multiple slashes into one before writting file name to file
+      $file =~ s/\/+\//\//g;
       print DIRLIST "$file\n";
     }
   }
@@ -866,6 +877,10 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.12  2001/08/24 03:09:22  techno91
+# - Richard applied a fix to properly process "Skip:" definitions
+#   when backing up the root directory ("/").
+#
 # Revision 1.11  2001/08/20 20:05:40  techno91
 # - Added a check before using Net::FTP to prevent errors.
 #
