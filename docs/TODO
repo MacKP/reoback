@@ -27,11 +27,13 @@ Document requirements:
      perl -MCPAN -e 'install Net::FTP'
 
 - Conditional load of modules
-
-- backup reset
+- backup reset (pass parameter to remove *.dat files)
 - Create any dirs. that doesn't exist.
 - Supress tar output from STDOUT
 - Log file creation
 - Mail notifications
 - Command line parameters
 - Update man pages and documentation
+- Read the /etc/reoback/settings.conf by default
+- Follow Mandrake's file locations (found in the mandrake rpms)
+
