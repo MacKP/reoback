@@ -1,3 +1,41 @@
+############################################################################
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+
+------------------------------------
+  OVERVIEW
+------------------------------------
+
+In the many years that I've been using computers, backups were the one 
+essential practice that I always procrastinated with.  Mainly because 
+commercial backup programs are either too complex or to much to configure.  
+They always seem to do more than you want it to.  I always envisioned a 
+simple solution that I can use, where all I have to do is define what I 
+want to backup, schedule the program, and let it loose!
+
+Finally early this year (2001), I was hired by a hosting company to 
+develop a backup solution "that worked!".  So I started developing a 
+solution I called "Easy Backup".  And the idea was really simple, 
+full/incremental backups.  A few months later, the solution gradually 
+leaned towards cobalt support more than anything else.  I left the company 
+and the solution was stable with a couple of features left not 
+implemented.
+
+Which leads us to REOBack!  REOBack is a spin off of Easy Backup with a few 
+routines added to support just about any UNIX based system. REOBack is meant 
+to be a simple, and is designed to be used by administrators and users alike.
+
+Enjoy!
+
 ------------------------------------
   THE BACKUP PROCESS
 ------------------------------------
@@ -120,3 +158,12 @@ Parts of the archive filename:
    6 - Backup day (range: backupdays - (backupdays x 2)
    7 - Extension (duh!)
    
+------------------------------------
+  FUTURE ENHANCEMENTS
+------------------------------------
+
+   - Web configuration interface
+   - Mail notifications
+   
+   If you have a feature request, make sure to add them to our source 
+   forge project page at: http://sourceforge.net/projects/reoback/
