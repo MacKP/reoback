@@ -1,0 +1,11 @@
+ReoBack: Backup Program for Linux
+     - INSTALL
+=================================
+
+Edit conf/files.conf to list the names of the backup tar files to be 
+created, as well as listing the files that should be included or skipped 
+during the backup process.
+
+Edit conf/settings.conf
+
+
