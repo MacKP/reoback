@@ -1,27 +1,41 @@
 #!/usr/bin/perl -w
-#############################################################################
-# Program	 ->	REOBack Beta 0.6
-#
-# Programmed by	 ->	Randy Oyarzabal (techno) 
-#			Richard Griswold
-#
-# Documentation  ->     Nate Steffenhagen
-#
-# Contact e-mail ->	reoback at penguinsoup.org
-#
-# Creation Date	 ->	April 02, 2001
-# Last Modified  ->	August 8, 2001
-#
-# Description 	 ->	A simple remote/local backup program that uses tar 
-#			and gzip to compress archives and transfer via FTP
-#			or NFS. 
 ############################################################################
-
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution 
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+#
+# Other developers and contributors:
+#    Richard Griswold
+#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Library General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+#
+###########################################################################
+#
+#             NO USER SERVICABLE PARTS BEYOND THIS POINT!
+#
+###########################################################################
 use strict;
 use Net::FTP;
 
 # SET CONSTANTS
-############################################################################
+###########################################################################
 
 my $VERSION	= "1.0 RC2";
 my $DATESTAMP   = `date +%Y%m%d`;  #Current date in format: 04092001
@@ -820,7 +834,7 @@ sub usage {
   print << "END_OF_INFO";
 
 REOBack Simple Backup Solution ver. $VERSION 
-(c) 2001, Randy E. Oyarzabal (techno91\@users.sourceforge.net)
+(c) 2001, Randy Oyarzabal (techno91\@users.sourceforge.net)
 
 Usage: reoback.pl [options] [<configfile>]
 
@@ -839,6 +853,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.8  2001/08/18 18:58:57  techno91
+# - Edited copyright notice headers.
+#
 # Revision 1.7  2001/08/18 06:43:59  techno91
 # - Cleaned code to prevent temporary files from cluttering root directory
 #   when program is run from a cron job.
