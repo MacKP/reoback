@@ -72,6 +72,7 @@ located at "/etc/reoback-1.0/conf/"
 
            File: NewsBackup
            /var/www/html/news
+           /var/www/html/newsinput.dat
 
            File: NewsArchiveBackup
            /var/www/html/newsArch
@@ -83,7 +84,8 @@ located at "/etc/reoback-1.0/conf/"
            # file 'Backup1'
 
            # The tar file 'NewsBackup' will contain '/var/www/html/news'
-           # and all subdirectories
+           # and all subdirectories.  It will also include the file
+           # /var/www/html/newsinput.dat
 
            # The tar file 'NewsArchiveBackup' will contain 
            # '/var/www/html/newsArch' and all subdirectories
