@@ -82,8 +82,8 @@ if ($config{"remotebackup"}){
 # Start backup process
 print "Archiving in progress...\n\n";
 # &backupDir($config{"mysqldbs"}, "MySQL", 0);
-# &backupDir($config{"sites"}, "Sites",    1);
 &processFiles();
+# &backupDir("/home/sforge/reoback", "Reoback",    1);
 
 &processDeletions();
 
@@ -147,7 +147,7 @@ sub backupDir{
 
         # Tar backup files
         print "    Archiving ".$_."...\n";
-        &archiveFile($fullPath, 1, $_, $fileName);
+        &archiveFile($fullPath, 1, $config{"tmpdir"}.$_, $fileName);
 
         # Transfer if needed.
         if ($config{"remotebackup"}){
@@ -160,7 +160,7 @@ sub backupDir{
         }
 
         # Remove temporary file
-        unlink ($_);
+          unlink ($_);
       }
    }
 }
@@ -332,14 +332,14 @@ sub scanDir{
       $skipFlag = 0;
     } elsif ( ( -f $curdir."/".$name ) or ( -l $curdir."/".$name ) ) {
       # File processing here...
-      &addToFile( $curdir."/".$name, $fileName, $btype, $fileList );
+      &addToFile( $curdir."/".$name, $fileName, $btype, $fileList, $subdirs );
     }
   }
   closedir RT;
 
   # Back up this directory if it is empty
   if ($count == 2){
-    &addToFile( $curdir, $fileName, $btype, $fileList );
+    &addToFile( $curdir, $fileName, $btype, $fileList, $subdirs );
   }
 
   # Recursively call this function on each directory in this directory
@@ -349,7 +349,7 @@ sub scanDir{
       if ( fileno DIRLIST ) {
         close DIRLIST;
       }
-      $fileName = "$bname.$_";
+      $fileName = $bname.".".$_;
     }
     &scanDir( $curdir."/".$_, $bname, $btype, $subdirs, $fileList, $fileName );
   }
@@ -391,7 +391,6 @@ sub parseConfig
     }
 
     my ($var, $val);
-#    if(!$cfgFile) { $cfgFile = $sDir."settings.cfg"; }
     open(CONF, "<$cfgFile") || die "Cannot find config file: $!\n";
     while (<CONF>) {
         chomp;                      # no newline
@@ -573,7 +572,7 @@ sub backupMisc {
      die "Cannot open \"$misc\": $!\n";
 
   $btype = $backupType eq "incremental" ? 1 : 0;
-  $fileName = $config{"tmpdir"}.$bName."list";
+  $fileName = $config{"tmpdir"}.$bName.".list";
 
   foreach ( <FILE> ) {
     if ( ( $_ !~ /^#/ ) and ( $_ !~ /^[ \t]*$/ ) ) { # Skip comments and blanks
@@ -605,7 +604,7 @@ sub backupMisc {
   close DIRLIST;
 
   if ( $gotfiles ) {
-    $tarName = $bName."-".$backupType."-".
+    $tarName = $config{"host"}."-".$bName."-".$backupType."-".
         $DATESTAMP."-".$TIMESTAMP."\.".$bCounter.$EXT;
 
     $fullPath = $localPath.$tarName;
@@ -645,22 +644,33 @@ sub addToFile {
   my $fileName = $_[1]; # Filename to write files to
   my $btype    = $_[2]; # Backup type: 0 = FULL, 1 = INCREMENTAL
   my $fileList = $_[3]; # List of file names
+  my $subdirs  = $_[4]; # If true, then $fileName is already complete.
   my $lastmod;          # Last modified date
+  my $fullPath;
 
+  if ($subdirs) {
+     $fullPath = $config{"tmpdir"}.$fileName;		
+  }
+  else {
+     $fullPath = $fileName;	
+  }
+  
+  
   if ( ( $file ne "\." ) and ( $file ne "\.\." ) ) {  # Ignore . and ..
     if ($btype){
       $lastmod = ( stat( $file ) )[10];
       if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
         if ( not fileno DIRLIST ) {
           push @{ $fileList }, $fileName;
-          open DIRLIST, ">>$fileName" or die "open \"$fileName\": $!\n";
+          
+          open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
         }
         print DIRLIST "$file\n";
       }
     } else {
       if ( not fileno DIRLIST ) {
         push @{ $fileList }, $fileName;
-        open DIRLIST, ">>$fileName" or die "open \"$fileName\": $!\n";
+        open DIRLIST, ">>$fullPath" or die "open \"$fullPath\": $!\n";
       }
       print DIRLIST "$file\n";
     }
@@ -829,6 +839,20 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.7  2001/08/18 06:43:59  techno91
+# - Cleaned code to prevent temporary files from cluttering root directory
+#   when program is run from a cron job.
+#
+# - Removed conf directory and moved files.cfg to files.conf.sample in
+#   the docs directory.
+#
+# Revision 1.6  2001/08/18 06:14:23  techno91
+# - Cleaned code to prevent temporary files from cluttering root directory
+#   when program is run from a cron job.
+#
+# - Removed conf directory and moved files.cfg to files.conf.sample in
+#   the docs directory.
+#
 # Revision 1.5  2001/08/17 21:42:13  techno91
 # - Configuration file is now passed as a parameter to reoback.pl.  This way
 #   it can be used dynamically by many users on one system.
