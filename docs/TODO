@@ -16,6 +16,9 @@
 The following is a list of TODOs that we are hoping to implement before 
 the next release:
 
+  C = FIX Completed
+  P = FIX In Progress
+
 - Confusion on backupdays variable
 - Atomic full backups.  Backup should only be considered successful if the script
   ran completey.
@@ -23,10 +26,10 @@ the next release:
 - Commandline backup reset (pass parameter to remove *.dat files)
 - Supress tar output from STDOUT (done)
 - Log file creation
-- Mail notifications
+P - Mail notifications
 - Command line parameters to specify files/directories to backup
 - Update man pages and documentation
-- Read the /etc/reoback/settings.conf by default
+C - Read the /etc/reoback/settings.conf by default
 - Follow Mandrake's file locations (found in the mandrake rpms)
 - Add support for SMB mounting, similar to NFS mounting
 - Add option to backup subdirectories in separate archives
@@ -40,12 +43,12 @@ the next release:
 - Implement file locking to prevent multiple instances from overwriting 
   each others files.
 - Implement perl regular expressions for file inclusions
-- "Transferring file..." message broken (doesn't display)
+C - "Transferring file..." message broken (doesn't display)
   due to filtering process, fix.
-- Change default permissions of settings.conf to 0600
+C - Change default permissions of settings.conf to 0600
 - Add tarball filesize to output
 - Add configuration for user/group owner of archive files, if ran as root
 - Add configuration for FTP passive mode support (see forum suggestion)
-- Add SCP support.  A patch (passwordless SCP) is available in the mailing list 
+C - Add SCP support.  A patch (passwordless SCP) is available in the mailing list 
   archive.  Need to change this to also support user/password authenticated transfers.
-- Commandline support to force full backups on every run.
+C - Commandline support to force full backups on every run.
