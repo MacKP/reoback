@@ -10,8 +10,10 @@
 # Copyright (c) 2001, 2002 Randy Oyarzabal (techno91@users.sourceforge.net)
 #
 # Other developers and contributors:
+#	 Andy Swanner	   (andys6276@users.sourceforge.net)
 #    Richard Griswold  (griswold@users.sourceforge.net)
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+#	 Anthony L. Awtrey SCP Patch
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,16 +37,21 @@
 #
 use strict;
 
+use IO::File;
+
 # SET CONSTANTS
 ###########################################################################
 
-my $VERSION     = "1.0 Release 3";  # REOBack version number
+my $VERSION     = "Pre 1.1";  # REOBack version number
 my $DATESTAMP   = `date +%Y%m%d`;   # Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`; # Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;   # Current time in format: 0945PM
 my $TARCMD      = "tar -cpzf";       # Command to use to create tar files
 my $NFSCMD      = "mount -o rw,soft,intr,wsize=8192,rsize=8192";
 my $EXT         = "\.tgz";          # Tar file extension
+my $OS			= `uname -s`;
+my $cfgFile		= '/etc/reoback/settings.conf';		# Main Config File
+my $logFile 	= '/var/log/reoback.log'; 			# Main Log File
 
 # GLOBAL VARIABLES
 ###########################################################################
@@ -60,7 +67,12 @@ my $bCounter;           # Backup counter.
 my $localPath;          # Local path for archives.
 my $remotePath;         # Remote path for archives.
 my $nfsPath;            # NFS path for archives.
+my $forceFULL = "false"; # Flag for Full Update
+my $mail;				# Email Address
 
+my $mailer = new IO::File;
+my $Log = new IO::File;
+	
 # Parse configuration and load variables to the hash table
 # Determine what type of backup to perform
 &parseConfig();
@@ -92,6 +104,10 @@ if ( !-e $localPath ) {
     die "Unable to create directory for archives '$localPath': $!\n";
 }
 
+if ( -e $cfgFile ) {
+	chmod ( 0600, $cfgFile);
+}
+
 # Check for remote backup
 if ( $config{"remotebackup"} ) {
   # Mount NFS volume if necessary.
@@ -111,6 +127,15 @@ if ( $config{"remotebackup"} ) {
     die "Unable to create directory for NFS backup '$nfsPath': $!\n";
     }
     print "done.\n\n";
+  }
+
+  # Prepare for SCP transfer
+  elsif ( $config{"rbackuptype"} eq "SCP" ) {
+    if ( findModule( "Net/SCP.pm" ) ) {
+      require Net::SCP;
+    } else {
+      die "You must install the Net::SCP to perform a remote backup via SCP\n";
+	}
   }
 
   # Prepare for FTP transfer
@@ -154,7 +179,7 @@ if ( $config{"keeplocalcopy"} ) {
 else {
   rmdir ( $localPath ) or
     print "  Unable to remove local directory: ".$!."!\n\n";
-  print "All local archives were removed.\n";
+  	print "All local archives were removed.\n";
 }
 
 $endTime = time() - $startTime;
@@ -190,17 +215,31 @@ sub archiveFile{
   # Create the tar archive.  Use this method instead of system() so that we
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
-  if ( $skipFile ) {
-    open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
+  if ( grep {/Linux|Darwin/} $OS ) {
+    
+  		if ( $skipFile ) {
+    		open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
+  		}
+  		else {
+    		open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
+  		}
+
+  } elsif ( grep {/OpenBSD/} $OS ) {
+
+  		if ( $skipFile ) {
+    		open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
+  		}
+  		else {
+    		open PROC, "$TARCMD $fileName -I $listName.incl 2>&1|";
+  		}
+   
   }
-  else {
-    open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
-  }
+
   foreach ( <PROC> ) {
     if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
   }
-  close PROC;
-}
+  	close PROC;
+  }
 
 # Description:  Routine for transferring a file to the remote backup
 #               location.
@@ -209,14 +248,23 @@ sub archiveFile{
 sub transferFile{
   my $fullPath = $_[0];      # Full path of local archive.
   my $fileName = $_[1];      # Filename to transfer.
-  my $ftp;                   # FTP connection object.
   my $startTime = time();
   my $endTime;
   my $errFlag = 0;
 
-  print "    Transferring archive: ".$fileName."...";
-  if ( $config{"rbackuptype"} eq "FTP" ) {
-    $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 0 ) or
+  print "    Transferring archive: ".$fileName."...\n";
+  if ( $config{"rbackuptype"} eq "SCP" ) {
+     my $scp;
+     $scp = Net::SCP->new( $config{"remotehost"}, $config{"scpuser"} ) or
+        die ("Unable to connect to remote host! : $!\n");
+     # Recursively make directory
+     $scp->mkdir($remotePath);
+     # Transfer tar file to remote location
+     $scp->put($fullPath,$remotePath) or $errFlag = 1;
+  }
+  elsif ( $config{"rbackuptype"} eq "FTP" ) {
+    my $ftp;                   # FTP connection object.
+    $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 1, Passive => 1 ) or
       die ( "Unable to connect to remote host! : $!\n" );
     $ftp->login( $config{"ftpuser"},$config{"ftppasswd"} ) or
       die ( "Unable to login to remote host! : $!\n" );
@@ -348,13 +396,12 @@ sub scanDir{
 # Parameter(s): none.
 # Returns:      Nothing
 sub parseConfig {
-  my $cfgFile;
   my $argNum = @ARGV;
-  if ( ( $argNum == 0 ) || ( $argNum > 1 ) ) {
+  if ( $argNum > 1 ) {
     &usage;
     exit;
   }
-  if ( $argNum == 1 ) {
+  if ( $argNum >= 1 ) {
     my $arg = $ARGV[0];
     if ( $arg =~ /^-h$|^--help$|^--usage$/ ) {
       &usage;
@@ -366,6 +413,13 @@ sub parseConfig {
     }
     elsif ( -f $arg ) {
       $cfgFile = $arg;
+    }
+    elsif ( $arg =~ /^-f$|^--full$/ ) {
+    	print("found full");
+    	$forceFULL = "True";
+    }
+    elsif ( $arg =~ /-m\s\b([A-z0-9.@])\b/ ) {
+    	$mail = $1
     }
     else {
       &usage;
@@ -451,6 +505,14 @@ sub backupType {
     }
   }
 
+  if ( grep {/True/} $forceFULL ) {
+  
+  		$backupType = "full";
+  		$bCounter = 1;
+  		$lastFull = $startTime;
+  		
+  }
+  
   $lTime = localtime( $lastFull );
   &version;
   print "\nRunning backup on $config{'host'}.\n";
@@ -875,12 +937,15 @@ sub usage {
   print << "END_OF_INFO";
 
 REOBack Simple Backup Solution ver. $VERSION
+(c) 2006  Andy Swanner (andys6276\@users.sourceforge.net)
 (c) 2001, 2002 Randy Oyarzabal (techno91\@users.sourceforge.net)
 
 Usage: reoback.pl [options] [<configfile>]
 
 Options:
 -v, --version           Display version information.
+-f, --full              Force Full Backup.
+-m,                     Email address to send output.
 -h, --help, --usage     Display this help information.
 
 See http://sourceforge.net/projects/reoback/ for project info.
@@ -903,6 +968,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.20  2006/11/15 05:21:46  andys6276
+# Added -f/--full flag to force full backupsAdded check for Linux/Darwin/OpenBSD/FreeBSD to deal with different versions of tarAdded SCP code
+#
 # Revision 1.19  2002/04/02 05:50:11  griswold
 #
 # - Check the mtime field (field 9) from lstat instead of the ctime field
