@@ -18,6 +18,7 @@ the next release:
 
   C = FIX Completed
   P = FIX In Progress
+  NE - Need Enhanced
 
 - Confusion on backupdays variable
 - Atomic full backups.  Backup should only be considered successful if the script
@@ -29,7 +30,7 @@ the next release:
 P - Mail notifications
 - Command line parameters to specify files/directories to backup
 - Update man pages and documentation
-C - Read the /etc/reoback/settings.conf by default
+C - Read the /etc/reoback/settings.conf by default (WITHDRAW THIS ITEM, see BUGS)
 - Follow Mandrake's file locations (found in the mandrake rpms)
 - Add support for SMB mounting, similar to NFS mounting
 - Add option to backup subdirectories in separate archives
@@ -45,10 +46,10 @@ C - Read the /etc/reoback/settings.conf by default
 - Implement perl regular expressions for file inclusions
 C - "Transferring file..." message broken (doesn't display)
   due to filtering process, fix.
-C - Change default permissions of settings.conf to 0600
+C - Change default permissions of settings.conf to 0600 (WITHDRAW THIS ITEM, see BUG)
 - Add tarball filesize to output
 - Add configuration for user/group owner of archive files, if ran as root
 - Add configuration for FTP passive mode support (see forum suggestion)
 C - Add SCP support.  A patch (passwordless SCP) is available in the mailing list 
   archive.  Need to change this to also support user/password authenticated transfers.
-C - Commandline support to force full backups on every run.
+NE - Commandline support to force full backups on every run.
