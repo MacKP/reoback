@@ -13,4 +13,14 @@
 #    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
 ############################################################################
 
-No known bugs at this time.
+Current bugs/changes need fixed in CVS rev. 1.20:
+
+- Forced full back-ups should not affect the .dat files so that the next 
+run works normally.
+- Refrain from using pattern match where possible since its an expensive
+operation, use logicals (eq or =) and simple types like 1 for True.
+- Externalize logs, compression commands.
+- Need to remove reference to config (and chenge perms) from main program file 
+(contrary to the TODO) because REOBack is meant to be used in a multi-user 
+environment not only admin.  So, it should pass the config via parameter.
+
