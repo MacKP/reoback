@@ -19,8 +19,10 @@ Current bugs/changes need fixed in CVS rev. 1.20:
 run works normally.
 - Refrain from using pattern match where possible since its an expensive
 operation, use logicals (eq or =) and simple types like 1 for True.
-- Externalize logs, compression commands.
+- Externalize logs, OS detection, compression commands.
 - Need to remove reference to config (and chenge perms) from main program file 
 (contrary to the TODO) because REOBack is meant to be used in a multi-user 
 environment not only admin.  So, it should pass the config via parameter.
+- Need to add and test SCP parameters to the settings file.  Need to consoldate
+user/pass for SCP, FTP and possibly Samba.
 
