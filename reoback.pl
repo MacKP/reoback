@@ -7,13 +7,13 @@
 # REOBack Simple Backup Solution
 # http://sourceforge.net/projects/reoback/
 #
-# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91@users.sourceforge.net)
+# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91<at>users.sourceforge.net)
 #
 # Other developers and contributors:
-#	 Andy Swanner	   (andys6276@users.sourceforge.net)
-#    Richard Griswold  (griswold@users.sourceforge.net)
-#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
-#	 Anthony L. Awtrey SCP Patch
+#	 Andy Swanner	   (andys6276<at>users.sourceforge.net)
+#    Richard Griswold  (griswold<at>users.sourceforge.net)
+#    Nate Steffenhagen (frankspikoli<at>users.sourceforge.net)
+#	 Anthony L. Awtrey, SCP Patch
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,8 +37,6 @@
 #
 use strict;
 
-use IO::File;
-
 # SET CONSTANTS
 ###########################################################################
 
@@ -49,9 +47,6 @@ my $TIMESTAMP   = `date +%I%M%p`;   # Current time in format: 0945PM
 my $TARCMD      = "tar -cpzf";       # Command to use to create tar files
 my $NFSCMD      = "mount -o rw,soft,intr,wsize=8192,rsize=8192";
 my $EXT         = "\.tgz";          # Tar file extension
-my $OS			= `uname -s`;
-my $cfgFile		= '/etc/reoback/settings.conf';		# Main Config File
-my $logFile 	= '/var/log/reoback.log'; 			# Main Log File
 
 # GLOBAL VARIABLES
 ###########################################################################
@@ -69,9 +64,6 @@ my $remotePath;         # Remote path for archives.
 my $nfsPath;            # NFS path for archives.
 my $forceFULL = "false"; # Flag for Full Update
 my $mail;				# Email Address
-
-my $mailer = new IO::File;
-my $Log = new IO::File;
 	
 # Parse configuration and load variables to the hash table
 # Determine what type of backup to perform
@@ -102,10 +94,6 @@ $nfsPath    =~ s/\/+/\//g;
 if ( !-e $localPath ) {
   &mkdirp( $localPath, 0700 ) or
     die "Unable to create directory for archives '$localPath': $!\n";
-}
-
-if ( -e $cfgFile ) {
-	chmod ( 0600, $cfgFile);
 }
 
 # Check for remote backup
@@ -215,31 +203,17 @@ sub archiveFile{
   # Create the tar archive.  Use this method instead of system() so that we
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
-  if ( grep {/Linux|Darwin/} $OS ) {
-    
-  		if ( $skipFile ) {
-    		open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
-  		}
-  		else {
-    		open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
-  		}
-
-  } elsif ( grep {/OpenBSD/} $OS ) {
-
-  		if ( $skipFile ) {
-    		open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
-  		}
-  		else {
-    		open PROC, "$TARCMD $fileName -I $listName.incl 2>&1|";
-  		}
-   
+  if ( $skipFile ) {
+    open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
   }
-
+  else {
+    open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
+  }
   foreach ( <PROC> ) {
     if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
   }
-  	close PROC;
-  }
+  close PROC;
+}
 
 # Description:  Routine for transferring a file to the remote backup
 #               location.
@@ -396,12 +370,13 @@ sub scanDir{
 # Parameter(s): none.
 # Returns:      Nothing
 sub parseConfig {
+  my $cfgFile;
   my $argNum = @ARGV;
-  if ( $argNum > 1 ) {
+  if ( ( $argNum == 0 ) || ( $argNum > 1 ) ) {
     &usage;
     exit;
   }
-  if ( $argNum >= 1 ) {
+  if ( $argNum == 1 ) {
     my $arg = $ARGV[0];
     if ( $arg =~ /^-h$|^--help$|^--usage$/ ) {
       &usage;
@@ -425,6 +400,10 @@ sub parseConfig {
       &usage;
       exit;
     }
+  }
+
+  if ( -e $cfgFile ) {
+	chmod ( 0600, $cfgFile);
   }
 
   my ( $var, $val );
@@ -937,14 +916,13 @@ sub usage {
   print << "END_OF_INFO";
 
 REOBack Simple Backup Solution ver. $VERSION
-(c) 2006  Andy Swanner (andys6276\@users.sourceforge.net)
-(c) 2001, 2002 Randy Oyarzabal (techno91\@users.sourceforge.net)
+(c) 2001, 2002 Randy Oyarzabal (techno91<at>users.sourceforge.net)
 
 Usage: reoback.pl [options] [<configfile>]
 
 Options:
 -v, --version           Display version information.
--f, --full              Force Full Backup.
+-f, --full              Force full backup.
 -m,                     Email address to send output.
 -h, --help, --usage     Display this help information.
 
@@ -968,8 +946,14 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.21  2007/11/16 22:47:10  techno91
+# - Prep code for stream-line process of 1.1 release
+# - Removed code for features not used yet.
+# - Removed config definition from constants.
+# - Fixed the commenting of the CVS logs on the bottom.
+#
 # Revision 1.20  2006/11/15 05:21:46  andys6276
-# Added -f/--full flag to force full backupsAdded check for Linux/Darwin/OpenBSD/FreeBSD to deal with different versions of tarAdded SCP code
+# - Added -f/--full flag to force full backups# - Added check for Linux/Darwin/OpenBSD/FreeBSD to deal with different versions of tar# - Added SCP code
 #
 # Revision 1.19  2002/04/02 05:50:11  griswold
 #
