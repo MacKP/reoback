@@ -6,11 +6,13 @@
 # REOBack Simple Backup Solution
 # http://sourceforge.net/projects/reoback/
 #
-# Copyright (c) 2001 Randy Oyarzabal (techno91@users.sourceforge.net)
+# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91<at>users.sourceforge.net)
 #
 # Other developers and contributors:
-#    Richard Griswold (griswold@users.sourceforge.net)
-#    Nate Steffenhagen (frankspikoli@users.sourceforge.net)
+#	 Andy Swanner	   (andys6276<at>users.sourceforge.net)
+#    Richard Griswold  (griswold<at>users.sourceforge.net)
+#    Nate Steffenhagen (frankspikoli<at>users.sourceforge.net)
+#	 Anthony L. Awtrey, SCP Patch
 ############################################################################
 
 		    GNU GENERAL PUBLIC LICENSE
