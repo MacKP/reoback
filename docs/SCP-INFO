@@ -1,5 +1,5 @@
 ############################################################################
-# REOBack - PACKAGING-CHECKLIST
+# REOBack - SCP-INFO
 # $Id$
 ############################################################################
 #
@@ -15,7 +15,4 @@
 #	 Anthony L. Awtrey, SCP Patch
 ############################################################################
 
-  1.  Ensure there are no debug statements in the main program file.
-  2.  Reset configuration to defaults.
-  3.  Update changes file.
-  4.  Be sure there are config options for new features (if necessary).
+See: http://acs.ucsd.edu/info/ssh.shtml#label4

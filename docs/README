@@ -202,9 +202,11 @@ You should now have an idea of how restores are performed.
 8. Remote backups.
 ----------------------------------------------------------------------
 
-Two types of remote backups are supported, NFS and FTP.  FTP has proven to 
-be slower compared to NFS so NFS is highly recommended.  However if you 
-decide to go with the NFS route, make sure you read NFS documentation.
+Three types of remote backups are supported, NFS, FTP and SCP.  
+FTP has proven to be slower compared to NFS and SCP, NFS or SCP is 
+highly recommended.  However if you decide to go with the NFS route, 
+make sure you read NFS documentation.  REOBack uses passwordless 
+connections only, so be sure to see SCP-INFO file.
 
 Note that REOBack simply needs the NFS mount-point to do NFS transfers.  
 REOBack automatically mounts and unmounts the mount-point.  Therefore, if 
