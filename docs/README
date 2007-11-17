@@ -206,7 +206,9 @@ Three types of remote backups are supported, NFS, FTP and SCP.
 FTP has proven to be slower compared to NFS and SCP, NFS or SCP is 
 highly recommended.  However if you decide to go with the NFS route, 
 make sure you read NFS documentation.  REOBack uses passwordless 
-connections only, so be sure to see SCP-INFO file.
+connections only, so be sure to see SCP-INFO file.  Due to a limitation
+in the SCP Perl module, REOBack is unable to do auto-deletions of 
+files backed up via SCP.
 
 Note that REOBack simply needs the NFS mount-point to do NFS transfers.  
 REOBack automatically mounts and unmounts the mount-point.  Therefore, if 
