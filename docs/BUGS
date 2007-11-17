@@ -17,6 +17,7 @@
 
 Current bugs/changes need fixed in CVS rev. 1.20:
 
+- SCP backup-type is incomplete, it does not remove old backups.
 - Forced full back-ups should not affect the .dat files so that the next 
 run works normally.
 - Refrain from using pattern match where possible since its an expensive
