@@ -44,8 +44,6 @@ my $VERSION     = "Pre 1.1";  # REOBack version number
 my $DATESTAMP   = `date +%Y%m%d`;   # Current date in format: 04092001
 my $DATESTAMPD  = `date +%Y-%m-%d`; # Current date in format: 04092001
 my $TIMESTAMP   = `date +%I%M%p`;   # Current time in format: 0945PM
-my $TARCMD      = "tar -cpzf";       # Command to use to create tar files
-my $NFSCMD      = "mount -o rw,soft,intr,wsize=8192,rsize=8192";
 my $EXT         = "\.tgz";          # Tar file extension
 
 # GLOBAL VARIABLES
@@ -62,8 +60,7 @@ my $bCounter;           # Backup counter.
 my $localPath;          # Local path for archives.
 my $remotePath;         # Remote path for archives.
 my $nfsPath;            # NFS path for archives.
-my $forceFULL = "false"; # Flag for Full Update
-my $mail;				# Email Address
+my $forceFull;			# Flag for Full Update
 	
 # Parse configuration and load variables to the hash table
 # Determine what type of backup to perform
@@ -103,7 +100,7 @@ if ( $config{"remotebackup"} ) {
     print "Mounting NFS volume in progress...";
 
     use File::Copy;  # We only need this if NFS backups are performed.
-    my $tmpCMD = $NFSCMD." ".$config{"remotehost"}.":".
+    my $tmpCMD = $config{"nfscommand"}." ".$config{"remotehost"}.":".
        $config{"remotepath"}." ".$config{"localmount"};
 
     if ( system ( $tmpCMD ) ) {
@@ -204,10 +201,10 @@ sub archiveFile{
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
   if ( $skipFile ) {
-    open PROC, "$TARCMD $fileName -T $listName.incl -X $listName.excl 2>&1|";
+    open PROC, $config{"tarcommand"} . " $fileName " . $config{"tarfileincl"} . " $listName.incl " . $config{"tarfileexcl"} . " $listName.excl 2>&1|";
   }
   else {
-    open PROC, "$TARCMD $fileName -T $listName.incl 2>&1|";
+    open PROC, $config{"tarcommand"} . " $fileName " . $config{"tarfileincl"} . " $listName.incl 2>&1|";
   }
   foreach ( <PROC> ) {
     if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
@@ -229,7 +226,7 @@ sub transferFile{
   print "    Transferring archive: ".$fileName."...\n";
   if ( $config{"rbackuptype"} eq "SCP" ) {
      my $scp;
-     $scp = Net::SCP->new( $config{"remotehost"}, $config{"scpuser"} ) or
+     $scp = Net::SCP->new( $config{"remotehost"}, $config{"remoteuser"} ) or
         die ("Unable to connect to remote host! : $!\n");
      # Recursively make directory
      $scp->mkdir($remotePath);
@@ -240,7 +237,7 @@ sub transferFile{
     my $ftp;                   # FTP connection object.
     $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 1, Passive => 1 ) or
       die ( "Unable to connect to remote host! : $!\n" );
-    $ftp->login( $config{"ftpuser"},$config{"ftppasswd"} ) or
+    $ftp->login( $config{"remoteuser"},$config{"remotepasswd"} ) or
       die ( "Unable to login to remote host! : $!\n" );
     $ftp->binary;
     $ftp->mkdir( $remotePath, 1 );  # Create parent directories if necessary
@@ -371,35 +368,53 @@ sub scanDir{
 # Returns:      Nothing
 sub parseConfig {
   my $cfgFile;
+  my $option;
+  $forceFull = 0;
   my $argNum = @ARGV;
-  if ( ( $argNum == 0 ) || ( $argNum > 1 ) ) {
+  if ( ( $argNum == 0 ) || ( $argNum > 2 ) ) {
     &usage;
     exit;
   }
+  $option = $ARGV[0];
   if ( $argNum == 1 ) {
-    my $arg = $ARGV[0];
-    if ( $arg =~ /^-h$|^--help$|^--usage$/ ) {
-      &usage;
-      exit;
+    if ( $option =~ /^-./ ){    	
+	    if ( $option =~ /^-h$|^--help$|^--usage$/ ) {
+    		&usage;
+      		exit;
+    	}
+    	elsif ( $option =~ /^-v$|^--version$/ ) {
+      		&version;
+      		exit;
+    	}
+    	else {
+      		&usage;
+      		exit;
+    	}
     }
-    elsif ( $arg =~ /^-v$|^--version$/ ) {
-      &version;
-      exit;
-    }
-    elsif ( -f $arg ) {
-      $cfgFile = $arg;
-    }
-    elsif ( $arg =~ /^-f$|^--full$/ ) {
-    	print("found full");
-    	$forceFULL = "True";
-    }
-    elsif ( $arg =~ /-m\s\b([A-z0-9.@])\b/ ) {
-    	$mail = $1
+    elsif ( -f $option ) {
+    	print "Config set\n";    	
+    	$cfgFile = $option;
     }
     else {
-      &usage;
-      exit;
-    }
+    	&usage;
+    	exit;
+    }    
+  }
+  if ( $argNum == 2 ) {
+    if ( $option =~ /^-f$|^--full$/ ) {
+    	$forceFull = 1;
+    	if ( -f $ARGV[1] ) {
+    		$cfgFile = $ARGV[1];
+    	}
+    	else {
+    		&usage;
+    		exit;
+    	}
+    } 
+    else {
+    	&usage;
+    	exit;    	
+    }      	
   }
 
   if ( -e $cfgFile ) {
@@ -484,18 +499,17 @@ sub backupType {
     }
   }
 
-  if ( grep {/True/} $forceFULL ) {
-  
+  if ($forceFull) {
   		$backupType = "full";
-  		$bCounter = 1;
-  		$lastFull = $startTime;
-  		
   }
   
   $lTime = localtime( $lastFull );
   &version;
   print "\nRunning backup on $config{'host'}.\n";
   print "Backup number $bCounter of ".( $backupDays*2 )." (backup days x 2)\n";
+  if ($forceFull){
+	print "Forced FULL backups requested via command-line parameter.\n";  	
+  }
   if ( $config{'remotebackup'} ) {
     print "Performing $backupType backup via $config{'rbackuptype'}\n";
   } else {
@@ -810,7 +824,7 @@ sub processDeletions{
       if ( $config{"rbackuptype"} eq "FTP" ) {
         $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 0 ) or
           warn ( "  Unable to connect to remote host! : $!\n" );
-        $ftp->login( $config{"ftpuser"},$config{"ftppasswd"} ) or
+        $ftp->login( $config{"remoteuser"},$config{"remotepasswd"} ) or
           warn ( "  Unable to login to remote host! : $!\n" );
       }
     }
@@ -841,13 +855,12 @@ sub processDeletions{
               warn ( "    Unable to delete remote file! : $!\n" );
             $ftp->rmdir( $rdir );
           }
-          else {
+          elsif ( $config{"rbackuptype"} eq "NFS" ) {
             truncTar( $rdir.$file );
             unlink ( $rdir.$file ) or
               warn ( "    Unable to delete remote file! : $!\n" );
             rmdir ( $rdir );
           }
-
         }
       }
       else {
@@ -862,10 +875,13 @@ sub processDeletions{
       die ( "    Unable to rename $tmpFile to $archFiles!: $!\n" );
 
     # Close connection if necessary
-    if ( $config{"remotebackup"} ) {
-      $ftp->quit unless $config{"rbackuptype"} eq "NFS";
+    if ( $config{"remotebackup"} && ($config{"rbackuptype"} eq "FTP") ) {      
+      $ftp->quit;
     }
     print "done.\n\n";
+    if ( $config{"rbackuptype"} eq "SCP" ) {
+    	print "Files on the SCP host were NOT deleted.\n";
+    }	
   }
 }
 
@@ -895,7 +911,7 @@ sub truncTar {
 
   # Truncate the archive by simply archiving the file containing definitions
   # of files/directories to backup.  This file *should* be less than 2GB.
-  open PROC, "$TARCMD $fileName $config{'files'} 2>&1|";
+  open PROC, $config{"tarcommand"} . " $fileName $config{'files'} 2>&1|";
   foreach ( <PROC> ) {
     if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
   }
@@ -923,7 +939,6 @@ Usage: reoback.pl [options] [<configfile>]
 Options:
 -v, --version           Display version information.
 -f, --full              Force full backup.
--m,                     Email address to send output.
 -h, --help, --usage     Display this help information.
 
 See http://sourceforge.net/projects/reoback/ for project info.
@@ -946,6 +961,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.22  2007/11/17 20:29:58  techno91
+# - Streamlined rev. 1.20 changes, force full, and SCP
+#
 # Revision 1.21  2007/11/16 22:47:10  techno91
 # - Prep code for stream-line process of 1.1 release
 # - Removed code for features not used yet.

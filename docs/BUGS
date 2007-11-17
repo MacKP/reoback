@@ -17,15 +17,20 @@
 
 Current bugs/changes need fixed in CVS rev. 1.20:
 
-- SCP backup-type is incomplete, it does not remove old backups.
-- Forced full back-ups should not affect the .dat files so that the next 
+- A known bug found, if a windows editor like Eclipse is used to edit 
+  the files.conf, running reoback might result in an error: 
+  "Modification of non-creatable array value attempted, subscript -1 
+  at /usr/bin/reoback.pl line 549, <FILE> line 73."  The solution is to
+  just resave the file in UNIX/Linux. I think this is caused by new-lines.
+- (N/A, api limitation) SCP backup-type is incomplete, it does not remove old backups.
+- (Fixed) Forced full back-ups should not affect the .dat files so that the next 
 run works normally.
-- Refrain from using pattern match where possible since its an expensive
+- (Fixed) Refrain from using pattern match where possible since its an expensive
 operation, use logicals (eq or =) and simple types like 1 for True.
-- Externalize logs, OS detection, compression commands.
-- Need to remove reference to config (and chenge perms) from main program file 
+- (Fixed) Externalize logs, OS detection, compression commands.
+- (Fixed) Need to remove reference to config (and chenge perms) from main program file 
 (contrary to the TODO) because REOBack is meant to be used in a multi-user 
 environment not only admin.  So, it should pass the config via parameter.
-- Need to add and test SCP parameters to the settings file.  Need to consoldate
+- (Fixed) Need to add and test SCP parameters to the settings file.  Need to consoldate
 user/pass for SCP, FTP and possibly Samba.
-
+- (Fixed) Code attempts to log off of FTP even when its an SCP transfer.
