@@ -59,7 +59,7 @@ my $backupType;         # Type of backup, "full" or "incremental".
 my $bCounter;           # Backup counter.
 my $localPath;          # Local path for archives.
 my $remotePath;         # Remote path for archives.
-my $nfsPath;            # NFS path for archives.
+my $localMount;         # Local mount path for remote back-ups.
 my $forceFull;			# Flag for Full Update
 	
 # Parse configuration and load variables to the hash table
@@ -80,12 +80,12 @@ if ( not -e $config{"datadir"} ) {
 # Setup paths to archives
 $localPath  = $config{"localbackup"}."/".$DATESTAMPD."/";
 $remotePath = $config{"remotepath"}."/".$DATESTAMPD."/";
-$nfsPath    = $config{"localmount"}."/".$DATESTAMPD."/";
+$localMount = $config{"localmount"}."/".$DATESTAMPD."/";
 
 # Remove extra slashes in paths
 $localPath  =~ s/\/+/\//g;
 $remotePath =~ s/\/+/\//g;
-$nfsPath    =~ s/\/+/\//g;
+$localMount =~ s/\/+/\//g;
 
 # Create local archive location if needed.
 if ( !-e $localPath ) {
@@ -95,25 +95,32 @@ if ( !-e $localPath ) {
 
 # Check for remote backup
 if ( $config{"remotebackup"} ) {
-  # Mount NFS volume if necessary.
-  if ( $config{"rbackuptype"} eq "NFS" ) {
-    print "Mounting NFS volume in progress...";
+	my $tmpCMD; # Full mount command
+	my $remoteStr;  # Identifier string
+ 	# Mount remote volume if necessary.
+ 	if ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
+    	use File::Copy;
+	  	if ( $config{"rbackuptype"} eq "NFS" ) {
+  			$remoteStr = "NFS";
+  			$tmpCMD = $config{"nfscommand"}." ".$config{"remotehost"}.":".
+  			$config{"remotepath"}." ".$config{"localmount"};  			
+  		} elsif ( $config{"rbackuptype"} eq "SMB" ){
+	  		$remoteStr = "SMB";	  		
+	  		$tmpCMD = $config{"smbcommand"}." username=".$config{"remoteuser"}.",password=".
+	  		$config{"remotepassword"}." ".$config{"remothpath"}." ".$config{"localmount"};       		  				  		
+ 		}
+  		print "Mounting $remoteStr volume in progress...";
 
-    use File::Copy;  # We only need this if NFS backups are performed.
-    my $tmpCMD = $config{"nfscommand"}." ".$config{"remotehost"}.":".
-       $config{"remotepath"}." ".$config{"localmount"};
-
-    if ( system ( $tmpCMD ) ) {
-      die ( "NFS mount command failed!\n\nAborting backups...\n" );
-    }
-    # Create NFS archive location if needed.
-    if ( !-e $nfsPath ) {
-      &mkdirp( $nfsPath, 0700 ) or
-    die "Unable to create directory for NFS backup '$nfsPath': $!\n";
-    }
-    print "done.\n\n";
+    	if ( system ( $tmpCMD ) ) {
+      		die ( "$remoteStr mount command failed!\n\nAborting backups...\n" );
+    	}
+	    # Create remote archive location if needed.
+	    if ( !-e $localMount ) {
+    		&mkdirp( $localMount, 0700 ) or
+    		die "Unable to create directory for $remotePath backup '$localMount': $!\n";
+    	}
+    	print "done.\n\n";
   }
-
   # Prepare for SCP transfer
   elsif ( $config{"rbackuptype"} eq "SCP" ) {
     if ( findModule( "Net/SCP.pm" ) ) {
@@ -146,9 +153,9 @@ print "Archiving in progress...\n\n";
 # Delete old backups that are no longer need
 &processDeletions();
 
-# Close NFS volume if necessary
+# Close remote volume if necessary
 if ( $config{"remotebackup"} ) {
-  if ( $config{"rbackuptype"} eq "NFS" ) {
+  if ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
     system ( "umount ".$config{"localmount"} );
   }
 }
@@ -249,7 +256,7 @@ sub transferFile{
     $ftp->quit;
   }
   else {
-    copy( $fullPath,$nfsPath.$fileName ) or $errFlag = 1;
+    copy( $fullPath,$localMount.$fileName ) or $errFlag = 1;
   }
   $endTime = time() - $startTime;
   $xferTime = $xferTime + $endTime;
@@ -855,7 +862,7 @@ sub processDeletions{
               warn ( "    Unable to delete remote file! : $!\n" );
             $ftp->rmdir( $rdir );
           }
-          elsif ( $config{"rbackuptype"} eq "NFS" ) {
+          elsif ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
             truncTar( $rdir.$file );
             unlink ( $rdir.$file ) or
               warn ( "    Unable to delete remote file! : $!\n" );
@@ -961,6 +968,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.23  2007/11/17 21:53:09  techno91
+# - Samba support added
+#
 # Revision 1.22  2007/11/17 20:29:58  techno91
 # - Streamlined rev. 1.20 changes, force full, and SCP
 #
