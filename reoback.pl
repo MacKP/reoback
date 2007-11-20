@@ -37,6 +37,14 @@
 #
 use strict;
 
+use File::stat;
+
+use Log::Log4perl qw(:easy);
+
+Log::Log4perl->easy_init($ERROR);
+
+my $Logger = Log::Log4perl->get_logger();
+
 # SET CONSTANTS
 ###########################################################################
 
@@ -70,11 +78,32 @@ my $forceFull;			# Flag for Full Update
 # Make sure that dirs exist (localmount and localbackup are checked below)
 if ( not -e $config{"tmpdir"} ) {
   &mkdirp( $config{"tmpdir"}, 0700 ) or
-    die "Unable to create 'tmpdir' directory '$config{'tmpdir'}': $!\n";
+    die $Logger->fatal("F001", "Unable to create 'datadir' directory $config{'tmpdir'}\n" );
 }
 if ( not -e $config{"datadir"} ) {
   &mkdirp( $config{"datadir"}, 0700 ) or
-    die "Unable to create 'datadir' directory '$config{'datadir'}': $!\n";
+    die $Logger->fatal("F002", "Unable to create directory $config{'datadir'}");
+}
+
+#Check that tarcommand, nfscommand, smbcommand tarfileincl tarfileexcl
+if ( not defined $config{"tarcommand"} ) {
+	die $Logger->fatal("F003", "Missing option tarcommand in settings.conf");
+}
+	
+if ( not defined $config{"nfscommand"} ) {
+	die $Logger->fatal("F004", "Missing option nfscommand in setttings.conf");
+}
+	
+if ( not defined $config{"smbcommand"} ) {
+	die $Logger->fatal("F005", "Missing option smbcommand in settings.conf");
+}
+	
+if ( not defined $config{"tarfileincl"} ) {
+	die $Logger->fatal("F006", "Missing option tarfileincl in settings.conf");
+}
+
+if ( not defined $config{"tarfileexcl"} ) {
+	die $Logger->fatal("F007", "Missing option tarfileexcl in setttings.conf")
 }
 
 # Setup paths to archives
@@ -90,7 +119,7 @@ $localMount =~ s/\/+/\//g;
 # Create local archive location if needed.
 if ( !-e $localPath ) {
   &mkdirp( $localPath, 0700 ) or
-    die "Unable to create directory for archives '$localPath': $!\n";
+    die $Logger->fatal("F008", "Unable to create Directory for archives $localPath");
 }
 
 # Check for remote backup
@@ -110,16 +139,18 @@ if ( $config{"remotebackup"} ) {
 	  		$config{"remotepassword"}." ".$config{"remothpath"}." ".$config{"localmount"};       		  				  		
  		}
   		print "Mounting $remoteStr volume in progress...";
+  		$Logger->info("I001", "Mounting NFS volume in progress...");
 
     	if ( system ( $tmpCMD ) ) {
-      		die ( "$remoteStr mount command failed!\n\nAborting backups...\n" );
+      		die $Logger->fatal("F009", "$remoteStr mount command failed!\n\nAborting backups...\n" );
+      		
     	}
 	    # Create remote archive location if needed.
 	    if ( !-e $localMount ) {
     		&mkdirp( $localMount, 0700 ) or
-    		die "Unable to create directory for $remotePath backup '$localMount': $!\n";
+    		die $Logger->fatal("F010", "Unable to create directory for NFS backup $remotePath backup $localMount: $!\n");
     	}
-    	print "done.\n\n";
+    	$Logger->info("I002", "Backup complete\n");
   }
   # Prepare for SCP transfer
   elsif ( $config{"rbackuptype"} eq "SCP" ) {
@@ -127,6 +158,7 @@ if ( $config{"remotebackup"} ) {
       require Net::SCP;
     } else {
       die "You must install the Net::SCP to perform a remote backup via SCP\n";
+      $Logger->error("E001", "You must install the Net::SCP to preform a remote backup via SCP\n");
 	}
   }
 
@@ -137,17 +169,21 @@ if ( $config{"remotebackup"} ) {
       Net::FTP->import();
     } else {
       die "You must install the Net::FTP to perform a remote backup via FTP\n";
+      $Logger->error("E002", "You must install the Net::FTP to preform a remote backup via FTP\n");
     }
   }
 
   # Invalid remote backup type
   else {
     print "Invalid remote backup type $config{'rbackuptype'}.  Ignoring.\n";
+    $Logger->error("E003", "Invalid remote bacdkup type $config{'rbackuptype'}. Ignoring.\n");
   }
 }
 
 # Start backup process
 print "Archiving in progress...\n\n";
+$Logger->info("I003", "Archiveing in progress...\n\n");
+
 &processFiles();
 
 # Delete old backups that are no longer need
@@ -166,18 +202,18 @@ print FILESTATUS $bCounter . "," . $lastFull;
 close FILESTATUS;
 
 if ( $config{"keeplocalcopy"} ) {
-  print "All local archives were saved in $localPath\n";
+  $Logger->info("I004", "All local archives were saved in localPath\n");
 }
 else {
   rmdir ( $localPath ) or
-    print "  Unable to remove local directory: ".$!."!\n\n";
-  	print "All local archives were removed.\n";
+    $Logger->error("E003", "Unable to remove local directroy: ".$!."!\n\n");
+    $Logger->error("E004", "All local archives were removed.\n");
 }
 
 $endTime = time() - $startTime;
 
-print "Total transfer time: ".timeCalc( $xferTime )."\.\n";
-print "Overall backup time: ".timeCalc( $endTime )."\.\n\n";
+$Logger->error("E005", "Total transfer time: timeCalc($xferTime). \n\n");
+$Logger->error("E006", "Overall backup time: timeCalc($endTime). \n\n");
 exit;
 
 # END MAIN #############################
@@ -204,6 +240,8 @@ sub archiveFile{
   my $listName = $_[1];      # Name(s) of include/exclude file(s).
   my $skipFile = $_[2];      # Non-zero if exclude file.
 
+  $Logger->debug("D001", "archiveFile $fileName -- $listName -- $skipFile");
+  
   # Create the tar archive.  Use this method instead of system() so that we
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
@@ -230,11 +268,12 @@ sub transferFile{
   my $endTime;
   my $errFlag = 0;
 
-  print "    Transferring archive: ".$fileName."...\n";
+  $Logger->info("I005", "Transferring archive: $fileName");
+  
   if ( $config{"rbackuptype"} eq "SCP" ) {
      my $scp;
      $scp = Net::SCP->new( $config{"remotehost"}, $config{"remoteuser"} ) or
-        die ("Unable to connect to remote host! : $!\n");
+        die ($Logger->error("E005","Unable to connect to remote host! : $!\n"));
      # Recursively make directory
      $scp->mkdir($remotePath);
      # Transfer tar file to remote location
@@ -243,13 +282,13 @@ sub transferFile{
   elsif ( $config{"rbackuptype"} eq "FTP" ) {
     my $ftp;                   # FTP connection object.
     $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 1, Passive => 1 ) or
-      die ( "Unable to connect to remote host! : $!\n" );
+      die ($Logger->error("E006", "Unable to connect to remote host! : $!\n"));
     $ftp->login( $config{"remoteuser"},$config{"remotepasswd"} ) or
-      die ( "Unable to login to remote host! : $!\n" );
+      die ($Logger->error("E007", "Unable to login to remote host! : $!\n"));
     $ftp->binary;
     $ftp->mkdir( $remotePath, 1 );  # Create parent directories if necessary
     $ftp->cwd( $remotePath ) or
-      die ( "Unable to change to remote directory! : $!\n" );
+      die $Logger->error("E008", "Unable to change to remote directory! : $!\n");
 
     # Transfer tar file to remote location
     $ftp->put( $fullPath ) or $errFlag = 1;
@@ -261,11 +300,12 @@ sub transferFile{
   $endTime = time() - $startTime;
   $xferTime = $xferTime + $endTime;
   if ( $errFlag ) {
-    print "FAILED! : $!\n\n";
+    $Logger->error("E009", "FAILIED! : $!\n\n");
   }
   else {
-    print "done.\n\n";
+    $Logger->error("E010", "Done.\n\n");
   }
+  $Logger->debug ("D003", "transferFile -- $fullPath $fileName $startTime $endTime $errFlag");
 }
 
 # Description:  Routine for recursively traversing a directory
@@ -337,6 +377,10 @@ sub scanDir{
       &addToExclude( $fname, $bname );
       $skipFile = 1;
     }
+    
+    $Logger->debug ("D004", "scanDir -- $curdir $bname $btype $skip $name $fname");
+    $Logger->debug ("D005", "scanDir -- @dirs $skipFlag $haveFile $skipFile $subHaveFile $subSkipFile");
+  
   }
   closedir RT;
 
@@ -378,6 +422,7 @@ sub parseConfig {
   my $option;
   $forceFull = 0;
   my $argNum = @ARGV;
+  
   if ( ( $argNum == 0 ) || ( $argNum > 2 ) ) {
     &usage;
     exit;
@@ -399,7 +444,7 @@ sub parseConfig {
     	}
     }
     elsif ( -f $option ) {
-    	print "Config set\n";    	
+    	$Logger->info("W006", "Config set\n");  	
     	$cfgFile = $option;
     }
     else {
@@ -442,6 +487,9 @@ sub parseConfig {
     $config{$var} = $val;               # load config value into the hash
   }
   close( CONF );
+  
+  $Logger->debug ("D006", "parseConfig -- $cfgFile $option $forceFull $argNum");
+  
 }
 
 # Description:  Routine for for determining what type of backup to
@@ -523,6 +571,9 @@ sub backupType {
     print "Performing $backupType backup on local system\n";
   }
   print "Last full backup: $lTime\n\n";
+  
+  $Logger->debug ("D007", "backupType -- $fstat $archFiles $backupDays @bstatus $lTime");
+  
 }
 
 # Description:  Process file containing definitions of files/directories to
@@ -569,7 +620,9 @@ sub processFiles {
       else {
         push @{ $arc[$i] }, $_;             # Push onto current archive list
       }
+      $Logger->debug ("D008", "processFiles -- $_ $i");
     }
+        
   }
   close FILE;
 
@@ -638,6 +691,7 @@ sub backupMisc {
         $haveFile = 1;
       }
     }
+    $Logger->debug ("D009", "backupMisc -- $bName $arc");
   }
 
   # Close include and exclude files
@@ -684,6 +738,8 @@ sub excludeFile {
   my $file     = $_[0]; # File to check
   my $lastmod;          # Last modified date
 
+  $Logger->warn ("1", "excludeFile -- $file $lastmod");
+  
   # Get last modify time for the file (or symlink)
   $lastmod = ( lstat( $file ) )[9];
   if ( ( not $lastmod ) or ( $lastmod > $lastFull ) ) {
@@ -703,6 +759,8 @@ sub addToExclude {
   my $file     = $_[0]; # File to check
   my $fileName = $_[1]; # Filename to write files to
 
+  $Logger->debug ("D009", "addToExclude -- $file $fileName");
+  
   # Open exclude file if it isn't already open, and push the name on
   # the list of exclude file names.
   if ( not fileno EXCLFILE ) {
@@ -725,6 +783,8 @@ sub addToInclude {
   my $file     = $_[0]; # File to check
   my $fileName = $_[1]; # Filename to write files to
 
+  $Logger->debug ("D010", "addToInclude -- $file $fileName");
+  
   # Open exclude file if it isn't already open, and push the name on
   # the list of exclude file names.
   if ( not fileno INCLFILE ) {
@@ -745,6 +805,8 @@ sub addToInclude {
 sub recordArchive{
   my $file = $_[0];    # Tar file to record
 
+  $Logger->debug ("1", "recordArchive -- $file");
+  
   # Record archives
   open ARCHIVES, ">>$archFiles" or die "Cannot open archive file ".
     "$archFiles (check your 'datadir' configuration setting)\n";
@@ -770,6 +832,8 @@ sub recordArchive{
 sub timeCalc{
   my $endTime = $_[0];
 
+  $Logger->debug ("D011", "timeCalc -- Before $endTime");
+  
   if ( $endTime > 3600 ) {
     $endTime = ( $endTime / 3600 );
     $endTime = sprintf "%.2f", $endTime;
@@ -784,6 +848,9 @@ sub timeCalc{
     $endTime = sprintf "%.2f", $endTime;
     $endTime = $endTime." seconds(s)";
   }
+  
+  $Logger->debug ("D012", "timeCalc -- After $endTime");
+  
   return $endTime;
 }
 
@@ -842,7 +909,9 @@ sub processDeletions{
       $ldir = $record[1];
       $rdir = $record[2];
       $file = $record[3];
-
+    
+      $Logger->debug ("1", "processDeletions - $buNum $ldir $rdir $file");
+      
       if ( ( $buNum >= $lower ) and ( $buNum <= $upper ) ) {
 
         # Delete local backup.
@@ -968,6 +1037,10 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.24  2007/11/20 05:12:51  andys6276
+# - Added checks for configuration options
+# - Added support for log4perl
+#
 # Revision 1.23  2007/11/17 21:53:09  techno91
 # - Samba support added
 #
