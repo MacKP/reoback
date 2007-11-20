@@ -15,4 +15,64 @@
 #	 Anthony L. Awtrey, SCP Patch
 ############################################################################
 
-See: http://acs.ucsd.edu/info/ssh.shtml#label4
+CONTENTS
+
+1. Generate ssh keys
+2. Collect and Distribute Keys
+3. Test SSH
+
+----------------------------------------------------------------------
+1. Generate SSH keys
+----------------------------------------------------------------------
+In order to generate keys you need to run ssh-keygen as the user you wish to be able to ssh 
+without entering password.
+
+ssh-keygen <options>
+
+-b 1024
+ 
+-t dsa
+
+-N "" this is need to ensure that a passphrase is not needed
+
+ssh-keygen -b 1024 -t dsa -N ""
+Hit enter to select the default file it should be id_dsa
+
+do this on both remote_host and localhost
+
+** Disclaimer this is just an example of how to setup, the security of DSA vs RSA or key size is out of the 
+scope of this document.
+
+----------------------------------------------------------------------
+1. Collect and Distribute Keys
+----------------------------------------------------------------------
+After you have generated the ssh keys you will have to collect the public keys from both the startpoint and endpoint 
+you intend on copying the backups to.
+
+cd ~/.ssh
+ls
+
+id_dsa id_dsa.pub
+
+cp id_dsa.pub authorized_keys
+scp authorized_keys remote_host:~/.ssh
+ssh remote_host  (you will be propted for a password)
+cd ~/.ssh
+cat id_dsa.pub >> authorized_keys
+exit
+scp  remote_host:~/.ssh/authorized_keys .
+
+
+----------------------------------------------------------------------
+1. Test SSH
+----------------------------------------------------------------------
+ssh remote_host
+
+
+now you should be able to ssh from one side to the other with no problems
+
+if you have problems check the permissions id_dsa should be 
+chmod 600 id_dsa
+chmod 644 id_dsa.pub
+chmod 644 authorized_keys
+
