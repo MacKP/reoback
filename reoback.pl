@@ -48,7 +48,8 @@ my $EXT         = "\.tgz";          # Tar file extension
 my @VALID_OPTIONS = qw(host backupdays files tmpdir datadir localbackup 
                     keeplocalcopy remotebackup rbackuptype localmount remotehost 
                     remotepath remoteuser remotepasswd tarcommand tarfileincl 
-                    tarfileexcl nfscommand smbcommand);
+                    tarfileexcl nfscommand smbcommand enablelogging uselog4perl 
+                    consolepriority log4perlconfig screenprintsenabled);
 
 # GLOBAL VARIABLES
 ###########################################################################
@@ -79,7 +80,7 @@ foreach (@VALID_OPTIONS) {
   }
 }
 if (!$configIsComplete) {
-  die ("Possible cause, you may be using and out-of-date settings file.  Aborting...\n");
+  die ("Possible cause, you may be using an out-of-date settings file or the option is commented.  Aborting.\n");
 }
 
 # Determine what type of backup to perform
@@ -984,6 +985,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
+# Revision 1.26  2007/11/21 08:51:38  techno91
+# - Preparation for configurable log4perl features.
+#
 # Revision 1.25  2007/11/21 00:00:14  techno91
 # - Added existence check for ALL config options
 # - Overwriting rev. 1.23 log4perl changes because it need to be
