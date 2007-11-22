@@ -18,22 +18,8 @@
 The following is a list of TODOs that we are hoping to implement before 
 the next release:
 
-  C = FIX Completed
-  P = FIX In Progress
-  NE - Need Enhanced (See BUGS)
-
 - Confusion on backupdays variable
-- Atomic full backups.  Backup should only be considered successful if the script
-  ran completey.
-- Delete all temp files before run.
-- Commandline backup reset (pass parameter to remove *.dat files)
-- Supress tar output from STDOUT (done)
-- Log file creation
-P - Mail notifications
 - Command line parameters to specify files/directories to backup
-- Update man pages and documentation
-C - Read the /etc/reoback/settings.conf by default (WITHDRAW THIS ITEM, see BUGS)
-- Follow Mandrake's file locations (found in the mandrake rpms)
 - Add support for SMB mounting, similar to NFS mounting
 - Add option to backup subdirectories in separate archives
 - Add configuration to change archive names
@@ -41,17 +27,8 @@ C - Read the /etc/reoback/settings.conf by default (WITHDRAW THIS ITEM, see BUGS
 - Remove default message of transer time if not doing remote backups
 - Add config for absolute path of tar, date and other dependent 
   executables.
-- Fix RPM package to set correct default values for run_reoback.sh, and 
-  settings.conf
 - Implement file locking to prevent multiple instances from overwriting 
   each others files.
-- Implement perl regular expressions for file inclusions
-C - "Transferring file..." message broken (doesn't display)
-  due to filtering process, fix.
-C - Change default permissions of settings.conf to 0600 (WITHDRAW THIS ITEM, see BUG)
 - Add tarball filesize to output
 - Add configuration for user/group owner of archive files, if ran as root
 - Add configuration for FTP passive mode support (see forum suggestion)
-NE - Add SCP support.  A patch (passwordless SCP) is available in the mailing list 
-  archive.  Need to change this to also support user/password authenticated transfers.
-NE - Commandline support to force full backups on every run.

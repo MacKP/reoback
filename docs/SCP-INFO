@@ -15,6 +15,9 @@
 #	 Anthony L. Awtrey, SCP Patch
 ############################################################################
 
+REOBack supports password-less SCP transfers.  The following document 
+explains how to do the SCP environment setup.
+
 CONTENTS
 
 1. Generate ssh keys
@@ -24,8 +27,8 @@ CONTENTS
 ----------------------------------------------------------------------
 1. Generate SSH keys
 ----------------------------------------------------------------------
-In order to generate keys you need to run ssh-keygen as the user you wish to be able to ssh 
-without entering password.
+In order to generate keys you need to run ssh-keygen as the user you wish 
+to be able to ssh without entering password.
 
 ssh-keygen <options>
 
@@ -40,14 +43,14 @@ Hit enter to select the default file it should be id_dsa
 
 do this on both remote_host and localhost
 
-** Disclaimer this is just an example of how to setup, the security of DSA vs RSA or key size is out of the 
-scope of this document.
+** Disclaimer this is just an example of how to setup, the security of DSA 
+vs RSA or key size is out of the scope of this document.
 
 ----------------------------------------------------------------------
 1. Collect and Distribute Keys
 ----------------------------------------------------------------------
-After you have generated the ssh keys you will have to collect the public keys from both the startpoint and endpoint 
-you intend on copying the backups to.
+After you have generated the ssh keys you will have to collect the public 
+keys from both the startpoint and endpoint you intend on copying the backups to.
 
 cd ~/.ssh
 ls
@@ -56,7 +59,7 @@ id_dsa id_dsa.pub
 
 cp id_dsa.pub authorized_keys
 scp authorized_keys remote_host:~/.ssh
-ssh remote_host  (you will be propted for a password)
+ssh remote_host  (you will be prompted for a password)
 cd ~/.ssh
 cat id_dsa.pub >> authorized_keys
 exit

@@ -15,6 +15,33 @@
 #	 Anthony L. Awtrey, SCP Patch
 ############################################################################
 
+November 23, 2007: Version 1.1 Release 1
+=================================
+
+- System commands such as mount and tar are now in the configuration file.
+
+- Added optional log4perl support or screen logging by priority.
+
+- Added ability to reset backups from the command-line option.
+
+- Added existence check for ALL config options.
+
+- Samba support added.
+
+- Added -f/--full flag to force full backups.
+
+- Added -r/--reset to reset backups (delete *.dat files).
+
+- SCP support added.  Due to limitations of the API, it does not
+    support auto-deletions of old backups.
+
+- Check the mtime field (field 9) from lstat instead of the ctime field
+   (field 10), since ctime doesn't seem to be set correctly on SMB mounted
+   filesystems.
+
+- Fixed bug with exclude file name when excluding individual files.
+
+
 
 March 23 2002: Version 1.0 Release 3
 =================================
