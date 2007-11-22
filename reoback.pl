@@ -48,8 +48,18 @@ my $EXT         = "\.tgz";          # Tar file extension
 my @VALID_OPTIONS = qw(host backupdays files tmpdir datadir localbackup 
                     keeplocalcopy remotebackup rbackuptype localmount remotehost 
                     remotepath remoteuser remotepasswd tarcommand tarfileincl 
-                    tarfileexcl nfscommand smbcommand enablelogging uselog4perl 
-                    consolepriority log4perlconfig screenprintsenabled);
+                    tarfileexcl nfscommand smbcommand uselog4perl consolepriority
+                    log4perlconfig screenprintsenabled);
+
+# Since I can't seem to conditionally "use" Log::Log4perl::Level, define
+# priorities manually.
+my $NONE = 0;
+my $TRACE = 5000;
+my $DEBUG = 10000;;
+my $INFO = 20000;
+my $WARN = 30000;
+my $ERROR = 40000;
+my $FATAL = 50000;
 
 # GLOBAL VARIABLES
 ###########################################################################
@@ -67,20 +77,38 @@ my $localPath;          # Local path for archives.
 my $remotePath;         # Remote path for archives.
 my $localMount;         # Local mount path for remote back-ups.
 my $forceFull;          # Flag for Full Update
-	
+my $logger;             # Log4perl logging instance
+my $priority;           # Console logging priority
+
 # Parse configuration and load variables to the hash table
 &parseConfig();
+
+&setLoggingPriority($config{"consolepriority"});
+
+if ($config{"uselog4perl"}) {
+  if ( findModule( "Log/Log4perl.pm" ) ) {
+      require Log::Log4perl;
+      Log::Log4perl->init($config{"log4perlconfig"}); 
+      $logger = Log::Log4perl->get_logger();
+    } else {
+      print("Log4Perl is enabled, but not installed. Turning it off now, logging to screen instead...\n");
+      $config{"uselog4perl"} = 0;
+    }
+}
+
+# From this point on, the logger can be called safely.
+logger($INFO, "REOBack version $VERSION started.");
 
 # Check to make sure that required options are defined in the setting file
 my $configIsComplete = 1;
 foreach (@VALID_OPTIONS) {
   if (!exists $config{$_}) {
      $configIsComplete = 0;
-     print("Configuration option: \"$_\" not found in $cfgFile.\n");
+     logger($ERROR,"Configuration option: \"$_\" not found in $cfgFile.");
   }
 }
 if (!$configIsComplete) {
-  die ("Possible cause, you may be using an out-of-date settings file or the option is commented.  Aborting.\n");
+  logDie("Possible cause, you may be using and out-of-date settings file.  Aborting...");
 }
 
 # Determine what type of backup to perform
@@ -89,11 +117,13 @@ if (!$configIsComplete) {
 # Make sure that dirs exist (localmount and localbackup are checked below)
 if ( not -e $config{"tmpdir"} ) {
   &mkdirp( $config{"tmpdir"}, 0700 ) or
-    die "Unable to create 'tmpdir' directory '$config{'tmpdir'}': $!\n";
+    logDie("Unable to create 'tmpdir' directory '$config{'tmpdir'}': $!");
+  logger($INFO, "Created $config{'tmpdir'} directory.");
 }
 if ( not -e $config{"datadir"} ) {
   &mkdirp( $config{"datadir"}, 0700 ) or
-    die "Unable to create 'datadir' directory '$config{'datadir'}': $!\n";
+    logDie("Unable to create 'datadir' directory '$config{'datadir'}': $!");
+   logger($INFO, "Created $config{'datadir'} directory.");
 }
 
 # Setup paths to archives
@@ -106,47 +136,50 @@ $localPath  =~ s/\/+/\//g;
 $remotePath =~ s/\/+/\//g;
 $localMount =~ s/\/+/\//g;
 
+logger($DEBUG, "\$localPath = $localPath");
+logger($DEBUG, "\$remotePath = $remotePath");
+logger($DEBUG, "\$localMount = $localMount");
+
 # Create local archive location if needed.
 if ( !-e $localPath ) {
   &mkdirp( $localPath, 0700 ) or
-    die "Unable to create directory for archives '$localPath': $!\n";
+    logDie("Unable to create directory for archives '$localPath': $!");
+  logger($INFO, "Created $localPath directory.");
 }
 
 # Check for remote backup
 if ( $config{"remotebackup"} ) {
-	my $tmpCMD; # Full mount command
-	my $remoteStr;  # Identifier string
+  my $tmpCMD; # Full mount command
     # Prepare for NFS or SMB transfers
- 	if ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
-    	use File::Copy;
-	  	if ( $config{"rbackuptype"} eq "NFS" ) {
-  			$remoteStr = "NFS";
-  			$tmpCMD = $config{"nfscommand"}." ".$config{"remotehost"}.":".
-  			$config{"remotepath"}." ".$config{"localmount"};  			
-  		} elsif ( $config{"rbackuptype"} eq "SMB" ){
-	  		$remoteStr = "SMB";	  		
-	  		$tmpCMD = $config{"smbcommand"}." username=".$config{"remoteuser"}.",password=".
-	  		$config{"remotepassword"}." ".$config{"remothpath"}." ".$config{"localmount"};
- 		}
-  		print "Mounting $remoteStr volume in progress...";
-
-    	if ( system ( $tmpCMD ) ) {
-      		die ( "$remoteStr mount command failed!\n\nAborting backups...\n" );
-    	}
-	    # Create remote archive location if needed.
-	    if ( !-e $localMount ) {
-    		&mkdirp( $localMount, 0700 ) or
-    		die "Unable to create directory for $remotePath backup '$localMount': $!\n";
-    	}
-    	print "done.\n\n";
+    if ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
+      use File::Copy;
+      if ( $config{"rbackuptype"} eq "NFS" ) {
+        $tmpCMD = $config{"nfscommand"}." ".$config{"remotehost"}.":".
+        $config{"remotepath"}." ".$config{"localmount"};  			
+     }elsif ( $config{"rbackuptype"} eq "SMB" ){
+        $tmpCMD = $config{"smbcommand"}." username=".$config{"remoteuser"}.",password=".
+        $config{"remotepassword"}." ".$config{"remothpath"}." ".$config{"localmount"};
+     }
+     printToScreen("Mounting $config{'rbackuptype'} volume in progress...");
+     logger($DEBUG, "Remote backup type: $config{'rbackuptype'}");
+     logger($DEBUG, "Mount command: $tmpCMD");
+     if ( system ( $tmpCMD ) ) {
+       logDie("$config{'rbackuptype'} mount command failed!\n\nAborting backups...");
+     }
+     # Create remote archive location if needed.
+     if ( !-e $localMount ) {
+       &mkdirp( $localMount, 0700 ) or
+       logDie("Unable to create directory for $remotePath backup '$localMount': $!");
+      }
+     printToScreen("done.\n\n");
   }
   # Prepare for SCP transfers
   elsif ( $config{"rbackuptype"} eq "SCP" ) {
     if ( findModule( "Net/SCP.pm" ) ) {
       require Net::SCP;
     } else {
-      die "You must install the Net::SCP to perform a remote backup via SCP\n";
-	}
+      logDie("You must install the Net::SCP to perform a remote backup via SCP.");
+    }
   }
 
   # Prepare for FTP transfers
@@ -155,18 +188,18 @@ if ( $config{"remotebackup"} ) {
       require Net::FTP;
       Net::FTP->import();
     } else {
-      die "You must install the Net::FTP to perform a remote backup via FTP\n";
+      logDie("You must install the Net::FTP to perform a remote backup via FTP.");
     }
   }
 
   # Invalid remote backup type
   else {
-    print "Invalid remote backup type $config{'rbackuptype'}.  Ignoring.\n";
+    logger($ERROR, "Invalid remote backup type $config{'rbackuptype'}.  Ignoring.");
   }
 }
 
 # Start backup process
-print "Archiving in progress...\n\n";
+printToScreen("Archiving in progress...\n\n");
 &processFiles();
 
 # Delete old backups that are no longer need
@@ -175,6 +208,7 @@ print "Archiving in progress...\n\n";
 # Close remote volume if necessary
 if ( $config{"remotebackup"} ) {
   if ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
+    logger($INFO, "Unmounting...umount $config{'localmount'}");
     system ( "umount ".$config{"localmount"} );
   }
 }
@@ -185,18 +219,20 @@ print FILESTATUS $bCounter . "," . $lastFull;
 close FILESTATUS;
 
 if ( $config{"keeplocalcopy"} ) {
-  print "All local archives were saved in $localPath\n";
+  printToScreen("All local archives were saved in $localPath\n");
 }
 else {
   rmdir ( $localPath ) or
-    print "  Unable to remove local directory: ".$!."!\n\n";
-  	print "All local archives were removed.\n";
+  logWarn("Unable to remove local directory: $!");
+  printToScreen("All local archives were removed.\n");
 }
 
 $endTime = time() - $startTime;
+logger($DEBUG, "\$endTime = $endTime");
 
-print "Total transfer time: ".timeCalc( $xferTime )."\.\n";
-print "Overall backup time: ".timeCalc( $endTime )."\.\n\n";
+printToScreen("Total transfer time: ".timeCalc( $xferTime )."\.\n");
+printToScreen( "Overall backup time: ".timeCalc( $endTime )."\.\n\n");
+logger($INFO, "REOBack version $VERSION ended.");
 exit;
 
 # END MAIN #############################
@@ -206,6 +242,8 @@ exit;
 # Returns:      Non-zero if module is found
 sub findModule {
   my $moduleName = $_[0];
+
+  logger($DEBUG, "findModule() - \$moduleName = $moduleName");
 
   foreach ( @INC ) {
     if ( -f "$_/$moduleName" ) { return 1; }
@@ -222,19 +260,27 @@ sub archiveFile{
   my $fileName = $_[0];      # Filename (full path) of archive to create.
   my $listName = $_[1];      # Name(s) of include/exclude file(s).
   my $skipFile = $_[2];      # Non-zero if exclude file.
+  my $tarCmd;                # Variable to hold tar command
+
+  logger($DEBUG, "archiveFile() - \$fileName = $fileName");
+  logger($DEBUG, "archiveFile() - \$listName = $listName");
+  logger($DEBUG, "archiveFile() - \$skipFile = $skipFile");
 
   # Create the tar archive.  Use this method instead of system() so that we
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
   if ( $skipFile ) {
-    open PROC, $config{"tarcommand"} . " $fileName " . $config{"tarfileincl"} . " $listName.incl " . $config{"tarfileexcl"} . " $listName.excl 2>&1|";
+    $tarCmd = "$config{'tarcommand'} $fileName $config{'tarfileincl'} $listName.incl  $config{'tarfileexcl'} $listName.excl";
+    open PROC, "$tarCmd 2>&1|";
   }
   else {
-    open PROC, $config{"tarcommand"} . " $fileName " . $config{"tarfileincl"} . " $listName.incl 2>&1|";
+    $tarCmd = "$config{'tarcommand'} $fileName $config{'tarfileincl'} $listName.incl";
+    open PROC, "$tarCmd 2>&1|";
   }
   foreach ( <PROC> ) {
     if ( $_ !~ /Removing leading `\/'/ ) { print $_; }
   }
+  logger($DEBUG, "archiveFile() - Tar command ran: \$tarCmd = $tarCmd");
   close PROC;
 }
 
@@ -249,26 +295,29 @@ sub transferFile{
   my $endTime;
   my $errFlag = 0;
 
-  print "    Transferring archive: ".$fileName."...\n";
+  logger($DEBUG, "transferFile() - \$fullPath = $fullPath");
+  logger($DEBUG, "transferFile() - \$fileName = $fileName");
+
+  printToScreen("    Transferring archive: ".$fileName."...\n");
   if ( $config{"rbackuptype"} eq "SCP" ) {
-     my $scp;
+     my $scp; # SCP connection object.
      $scp = Net::SCP->new( $config{"remotehost"}, $config{"remoteuser"} ) or
-        die ("Unable to connect to remote host! : $!\n");
+        logDie("Unable to connect to remote host! : $!");
      # Recursively make directory
      $scp->mkdir($remotePath);
      # Transfer tar file to remote location
      $scp->put($fullPath,$remotePath) or $errFlag = 1;
   }
   elsif ( $config{"rbackuptype"} eq "FTP" ) {
-    my $ftp;                   # FTP connection object.
+    my $ftp; # FTP connection object.
     $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 1, Passive => 1 ) or
-      die ( "Unable to connect to remote host! : $!\n" );
+      logDie("Unable to connect to remote host! : $!");
     $ftp->login( $config{"remoteuser"},$config{"remotepasswd"} ) or
-      die ( "Unable to login to remote host! : $!\n" );
+      logDie("Unable to login to remote host! : $!" );
     $ftp->binary;
     $ftp->mkdir( $remotePath, 1 );  # Create parent directories if necessary
     $ftp->cwd( $remotePath ) or
-      die ( "Unable to change to remote directory! : $!\n" );
+      logDie("Unable to change to remote directory! : $!\n");
 
     # Transfer tar file to remote location
     $ftp->put( $fullPath ) or $errFlag = 1;
@@ -280,10 +329,10 @@ sub transferFile{
   $endTime = time() - $startTime;
   $xferTime = $xferTime + $endTime;
   if ( $errFlag ) {
-    print "FAILED! : $!\n\n";
+    printToScreen("FAILED! : $!\n\n");
   }
   else {
-    print "done.\n\n";
+    printToScreen("done.\n\n");
   }
 }
 
@@ -302,6 +351,10 @@ sub scanDir{
   my $btype    = $_[2]; # Backup type: 0 = FULL, 1 = INCREMENTAL
   my $skip     = $_[3]; # Array ref for files/dirs to skip
 
+  logger($DEBUG, "scanDir() - \$curdir = $curdir");
+  logger($DEBUG, "scanDir() - \$bname = $bname");
+  logger($DEBUG, "scanDir() - \$btype = $btype");
+
   my $name;             # Name of an entry in current directory
   my $fname;            # Fully qualified name of an entry in current directory
   my @dirs;             # List of directories in this directory
@@ -312,7 +365,7 @@ sub scanDir{
   my $subSkipFile = 0;  # Non-zero if subdirectory has file to skip
 
   # Check all entries in this directory
-  opendir RT, $curdir or die "opendir \"$curdir\": $!\n";
+  opendir RT, $curdir or logDie("opendir \"$curdir\": $!");
   while ( $name = readdir RT ) {
     # Ignore this filename if it is '.' or '..'.
     if ( ( $name eq "\." ) or ( $name eq "\.\." ) ) { next; }
@@ -394,8 +447,9 @@ sub scanDir{
 # Returns:      Nothing
 sub parseConfig {
   my $option;
-  $forceFull = 0;
+  my $doReset = 0;
   my $argNum = @ARGV;
+  $forceFull = 0;
   if ( ( $argNum == 0 ) || ( $argNum > 2 ) ) {
     &usage;
     exit;
@@ -403,42 +457,52 @@ sub parseConfig {
   $option = $ARGV[0];
   if ( $argNum == 1 ) {
     if ( $option =~ /^-./ ){    	
-	    if ( $option =~ /^-h$|^--help$|^--usage$/ ) {
-    		&usage;
-      		exit;
-    	}
-    	elsif ( $option =~ /^-v$|^--version$/ ) {
-      		&version;
-      		exit;
-    	}
-    	else {
-      		&usage;
-      		exit;
-    	}
+      if ( $option =~ /^-h$|^--help$|^--usage$/ ) {
+        &usage;
+        exit;
+      }
+      elsif ( $option =~ /^-v$|^--version$/ ) {
+        &version;
+        exit;
+      }
+      else {
+        &usage;
+        exit;
+      }
     }
     elsif ( -f $option ) {
-    	$cfgFile = $option;
+      $cfgFile = $option;
     }
     else {
-    	&usage;
-    	exit;
+      &usage;
+      exit;
     }    
   }
   if ( $argNum == 2 ) {
     if ( $option =~ /^-f$|^--full$/ ) {
-    	$forceFull = 1;
-    	if ( -f $ARGV[1] ) {
-    		$cfgFile = $ARGV[1];
-    	}
-    	else {
-    		&usage;
-    		exit;
-    	}
-    } 
+      $forceFull = 1;
+      if ( -f $ARGV[1] ) {
+        $cfgFile = $ARGV[1];
+      }
+      else {
+        &usage;
+        exit;
+      }
+    }
+    elsif ( $option =~ /^-r$|^--reset$/ ) {
+      $doReset = 1;
+      if ( -f $ARGV[1] ) {
+        $cfgFile = $ARGV[1];
+      }
+      else {
+        &usage;
+        exit;
+      }
+    }	
     else {
-    	&usage;
-    	exit;    	
-    }      	
+      &usage;
+      exit;
+    }
   }
 
   if ( -e $cfgFile ) {
@@ -446,7 +510,7 @@ sub parseConfig {
   }
 
   my ( $var, $val );
-  open( CONF, "<$cfgFile" ) || die "Cannot find config file: $!\n";
+  open( CONF, "<$cfgFile" ) || logDie("Cannot find config file: $!");
   while ( <CONF> ) {
     chomp;                              # no newline
     if ( $_ !~ /^\s*ftppasswd\s*=/ ) {  # don't remove comments in FTP passwords
@@ -459,6 +523,10 @@ sub parseConfig {
     $config{$var} = $val;               # load config value into the hash
   }
   close( CONF );
+  if ($doReset) {
+    &resetBackups;
+    exit;
+  }
 }
 
 # Description:  Routine for for determining what type of backup to
@@ -529,17 +597,21 @@ sub backupType {
   
   $lTime = localtime( $lastFull );
   &version;
-  print "\nRunning backup on $config{'host'}.\n";
-  print "Backup number $bCounter of ".( $backupDays*2 )." (backup days x 2)\n";
+  printToScreen("\nRunning backup on $config{'host'}.\n");
+  printToScreen("Backup number $bCounter of ".( $backupDays*2 )." (backup days x 2)\n");
   if ($forceFull){
-	print "Forced FULL backups requested via command-line parameter.\n";  	
+    printToScreen("Forced FULL backups requested via command-line parameter.\n");
   }
   if ( $config{'remotebackup'} ) {
-    print "Performing $backupType backup via $config{'rbackuptype'}\n";
+    printToScreen("Performing $backupType backup via $config{'rbackuptype'}\n");
   } else {
-    print "Performing $backupType backup on local system\n";
+    printToScreen("Performing $backupType backup on local system\n");
   }
-  print "Last full backup: $lTime\n\n";
+  printToScreen("Last full backup: $lTime\n\n");
+
+  logger($DEBUG, "backupType() - \$bCounter = $bCounter");
+  logger($DEBUG, "backupType() - \$backupType = $backupType");
+  logger($DEBUG, "backupType() - \$lastFull = $lastFull");
 }
 
 # Description:  Process file containing definitions of files/directories to
@@ -559,7 +631,7 @@ sub processFiles {
 
   # Open file  containing definitions of files/directories to backup
   open FILE, "<$config{'files'}" or
-    die "Cannot open \"$config{'files'}\": $!\n";
+    logDie("Cannot open \"$config{'files'}\": $!");
 
   # Process the file
   foreach ( <FILE> ) {
@@ -617,7 +689,10 @@ sub backupMisc {
   my $fullPath;         # Full path to tar file to create
   my $tarName;          # Nmae of tar file to create
 
-  print "  Working on $bName...\n";
+  logger($DEBUG, "backupMisc() - \$bName = $bName");
+  logger($DEBUG, "backupMisc() - \$arc = $arc");
+
+  printToScreen("  Working on $bName...\n");
 
   # Initialize some variables
   $btype    = $backupType eq "incremental" ? 1 : 0; # Backup type as a number.
@@ -670,7 +745,7 @@ sub backupMisc {
 
     # Tar backup files and record it.  Need to let archiveFile() know if we
     # have a list of files to skip to prevent an error on the tar command.
-    print "    Archiving ".$bName."...\n";
+    printToScreen("    Archiving ".$bName."...\n");
     &archiveFile( $fullPath, $fileName, $skipFile );
     &recordArchive( $tarName );
 
@@ -684,7 +759,7 @@ sub backupMisc {
     }
   }
   else {
-    print "    No new or changed files since last full backup for $bName.\n\n";
+    printToScreen("    No new or changed files since last full backup for $bName.\n\n");
   }
 
   # Remove temporary files
@@ -723,7 +798,7 @@ sub addToExclude {
   # Open exclude file if it isn't already open, and push the name on
   # the list of exclude file names.
   if ( not fileno EXCLFILE ) {
-    open EXCLFILE, ">>$fileName" or die "open \"$fileName\": $!\n";
+    open EXCLFILE, ">>$fileName" or logDie("open \"$fileName\": $!");
   }
 
   # Collapse multiple slashes into one before writting file name to file
@@ -745,7 +820,7 @@ sub addToInclude {
   # Open exclude file if it isn't already open, and push the name on
   # the list of exclude file names.
   if ( not fileno INCLFILE ) {
-    open INCLFILE, ">>$fileName" or die "open \"$fileName\": $!\n";
+    open INCLFILE, ">>$fileName" or logDie("open \"$fileName\": $!\n");
   }
 
   # Collapse multiple slashes into one before writting file name to file
@@ -756,15 +831,14 @@ sub addToInclude {
 }
 
 # Description:  Routine to names of archives
-# Parameter(s): "name of file to add",
-#               "name of file to write to",
+# Parameter(s): "name of file to add"
 # Returns:      Nothing.
 sub recordArchive{
   my $file = $_[0];    # Tar file to record
 
   # Record archives
-  open ARCHIVES, ">>$archFiles" or die "Cannot open archive file ".
-    "$archFiles (check your 'datadir' configuration setting)\n";
+  open ARCHIVES, ">>$archFiles" or logDie("Cannot open archive file ".
+    "$archFiles (check your 'datadir' configuration setting)");
 
   if ( $config{"remotebackup"} ) {
     if ( $config{"rbackuptype"} eq "FTP" ) {
@@ -825,7 +899,7 @@ sub processDeletions{
   $secondDel = $backupDays*2;
 
   if ( ( $bCounter == $backupDays ) or ( $bCounter == $secondDel ) ) {
-    print "Deletions of old back-ups in progress...";
+    printToScreen("Deletions of old back-ups in progress...");
 
     open ( TARS, $archFiles );
     @records = <TARS>;
@@ -847,9 +921,9 @@ sub processDeletions{
     if ( $config{"remotebackup"} ) {
       if ( $config{"rbackuptype"} eq "FTP" ) {
         $ftp = Net::FTP->new( $config{"remotehost"}, Debug => 0 ) or
-          warn ( "  Unable to connect to remote host! : $!\n" );
+          logWarn("  Unable to connect to remote host! : $!" );
         $ftp->login( $config{"remoteuser"},$config{"remotepasswd"} ) or
-          warn ( "  Unable to login to remote host! : $!\n" );
+          logWarn("  Unable to login to remote host! : $!" );
       }
     }
     foreach ( @records ) {
@@ -865,8 +939,9 @@ sub processDeletions{
         # Delete local backup.
         if ( $config{"keeplocalcopy"} ) {
           truncTar( $ldir.$file );
+          logger($INFO, "Deleting local file: ".$ldir.$file);
           unlink ( $ldir.$file ) or
-            warn ( "    Unable to delete local file! : $!\n" );
+            logWarn("    Unable to delete local file! : $!" );
           rmdir ( $ldir );
         }
 
@@ -874,15 +949,17 @@ sub processDeletions{
         if ( $config{"remotebackup"} ) {
           if ( $config{"rbackuptype"} eq "FTP" ) {
             $ftp->cwd( $rdir ) or
-              warn ( "    Unable to change to remote directory! : $!\n" );
+              logWarn("    Unable to change to remote directory! : $!" );
+            logger($INFO, "Deleting remote file: $file");
             $ftp->delete( $file ) or
-              warn ( "    Unable to delete remote file! : $!\n" );
+              logWarn("    Unable to delete remote file! : $!" );
             $ftp->rmdir( $rdir );
           }
           elsif ( ($config{"rbackuptype"} eq "NFS") || ($config{"rbackuptype"} eq "SMB") ) {
             truncTar( $rdir.$file );
+            logger($INFO, "Deleting remote file: ".$rdir.$file);
             unlink ( $rdir.$file ) or
-              warn ( "    Unable to delete remote file! : $!\n" );
+              logWarn("    Unable to delete remote file! : $!" );
             rmdir ( $rdir );
           }
         }
@@ -894,9 +971,10 @@ sub processDeletions{
     }
     close TMPFILE;
 
-    unlink( $archFiles ) or die ( "    Unable to delete $archFiles!: $!\n" );
+    logger($INFO, "Deleting file: $archFiles");
+    unlink( $archFiles ) or logDie ( "    Unable to delete $archFiles!: $!" );
     move( $tmpFile, $archFiles ) or
-      die ( "    Unable to rename $tmpFile to $archFiles!: $!\n" );
+      logDie ( "    Unable to rename $tmpFile to $archFiles!: $!" );
 
     # Close connection if necessary
     if ( $config{"remotebackup"} && ($config{"rbackuptype"} eq "FTP") ) {      
@@ -904,7 +982,7 @@ sub processDeletions{
     }
     print "done.\n\n";
     if ( $config{"rbackuptype"} eq "SCP" ) {
-    	print "Files on the SCP host were NOT deleted.\n";
+    	printToScreen("Files on the SCP host were NOT deleted.\n");
     }	
   }
 }
@@ -942,6 +1020,94 @@ sub truncTar {
   close PROC;
 }
 
+# Description:  Routine for resetting backups.
+# Parameter(s): None
+# Returns:      Nothing
+sub resetBackups{
+  $fstat = $config{"datadir"}."status.dat";
+  $archFiles = $config{"datadir"}."archives.dat";
+  if (-f $fstat || -f $archFiles) {
+    unlink ($fstat) or logDie ("Unable to delete $fstat");
+    unlink ($archFiles) or logDie ("Unable to delete $archFiles");
+    printToScreen("Backups were sucessfully reset.\n");
+  } 
+  else {
+    printToScreen("Status files not found.  Backups already reset.\n");
+  }
+}
+
+# Description:  Routine for logging fatal errors.
+# Parameter(s): "Message to log"
+# Returns:      Nothing
+sub logDie{
+  my $message = shift;
+  if ($config{"uselog4perl"}) {
+    $logger->logdie($message);
+  } else {
+    logDie($message . "\n");
+  }
+}
+
+# Description:  Routine for logging warning messages. 
+# Parameter(s): "Message to log"
+# Returns:      Nothing
+sub logWarn{
+  my $message = shift;
+  if ($config{"uselog4perl"}) {
+    $logger->logwarn($message);
+  } else {
+    logWarn($message);
+  }
+}
+
+# Description:  Routine for logging messages.
+# Parameter(s): "Priority string",
+#               "Message to log"
+# Returns:      Nothing
+sub logger{
+  my $lPriority = $_[0];
+  my $message = $_[1];
+  if ($config{"uselog4perl"}) {
+    $logger->log($lPriority, $message);
+  } else {
+    if ($lPriority >= $priority) {
+     print($message . "\n");
+    }
+  }
+}
+
+# Description:  Routine for printing a message to the scren.
+# Parameter(s): "Message to print to screen"
+# Returns:      Nothing
+sub printToScreen{
+  my $message = shift;
+  if ($config{"screenprintsenabled"}) {
+     print($message);
+  }
+}
+
+# Description:  Routine for setting the console logging priority
+# Parameter(s): "Priority string"
+# Returns:      Nothing
+sub setLoggingPriority{
+  my $priorityString = shift;
+  if ($priorityString eq "TRACE") {
+    $priority = $TRACE;
+  } elsif ($priorityString eq "DEBUG") {
+    $priority = $DEBUG;
+  } elsif ($priorityString eq "INFO") {
+    $priority = $INFO;
+  } elsif ($priorityString eq "WARN") {
+    $priority = $WARN;
+  } elsif ($priorityString eq "ERROR") {
+    $priority = $ERROR;
+  } elsif ($priorityString eq "FATAL") {
+    $priority = $FATAL;
+  } else {
+    $priority = $NONE;
+  }
+}
+
 # Description:  Print version information
 # Parameter(s): None
 # Returns:      Nothing
@@ -961,9 +1127,10 @@ REOBack Simple Backup Solution ver. $VERSION
 Usage: reoback.pl [options] [<configfile>]
 
 Options:
--v, --version           Display version information.
--f, --full              Force full backup.
+-f, --full              Force full backup. (<configfile> required)
 -h, --help, --usage     Display this help information.
+-r, --reset             Reset backups to start at 1. (<configfile> required)
+-v, --version           Display version information.
 
 See http://sourceforge.net/projects/reoback/ for project info.
 
@@ -985,8 +1152,9 @@ END_OF_INFO
 ###############################################################################
 #
 # $Log$
-# Revision 1.26  2007/11/21 08:51:38  techno91
-# - Preparation for configurable log4perl features.
+# Revision 1.27  2007/11/22 06:31:03  techno91
+# - Added optional log4perl support or screen logging by priority
+# - Added ability to reset backups from the command-line option
 #
 # Revision 1.25  2007/11/21 00:00:14  techno91
 # - Added existence check for ALL config options
@@ -1142,5 +1310,3 @@ END_OF_INFO
 # Revision 1.4  2001/08/08 21:48:30  techno91
 # Initial load into CVS.
 #
-#
-
