@@ -1,0 +1,25 @@
+############################################################################
+# REOBack - PACKAGING-CHECKLIST
+# $Id$
+############################################################################
+#
+# REOBack Simple Backup Solution
+# http://sourceforge.net/projects/reoback/
+#
+# Copyright (c) 2001, 2002 Randy Oyarzabal (techno91<at>users.sourceforge.net)
+#
+# Other developers and contributors:
+#	 Andy Swanner	   (andys6276<at>users.sourceforge.net)
+#    Richard Griswold  (griswold<at>users.sourceforge.net)
+#    Nate Steffenhagen (frankspikoli<at>users.sourceforge.net)
+#	 Anthony L. Awtrey, SCP Patch
+############################################################################
+
+  1.  Ensure there are no debug statements in the main program file.
+  2.  Reset configuration to defaults.
+  3.  Update changes file.
+  4.  Be sure there are config options for new features (if necessary).
+
+ Man page testing command:
+    groff -man -Tascii <man page file> 
+ 

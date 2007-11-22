@@ -89,7 +89,7 @@ file:	docs/LICENSE <---------	The GNU public license
 dir:	conf <----------------- Configuration files.
 file:	conf/settings.conf <---	Configuration file
 file:	conf/files.conf <------ Configuration file
-
+file:	conf/log4perl.conf <--- Log4perl configuration file
 
 dir:    data <----------------- Directory to keep data files to keep 
 				track of what type of backup to run.
