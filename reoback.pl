@@ -185,6 +185,7 @@ if ( $config{"remotebackup"} ) {
   # Prepare for FTP transfers
   elsif ( $config{"rbackuptype"} eq "FTP" ) {
     if ( findModule( "Net/FTP.pm" ) ) {
+      use IO::Socket::SSL;
       require Net::FTP;
       Net::FTP->import();
     } else {
