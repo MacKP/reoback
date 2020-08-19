@@ -271,7 +271,7 @@ sub archiveFile{
   # can filter out the "Removing leading `/'" messages.  '2>&1' redirects
   # error messages from tar to stdout so we can catch them.
   if ( $skipFile ) {
-    $tarCmd = "$config{'tarcommand'} $fileName $config{'tarfileincl'} $listName.incl  $config{'tarfileexcl'} $listName.excl";
+    $tarCmd = "$config{'tarcommand'} $fileName $config{'tarfileexcl'} $listName.excl $config{'tarfileincl'} $listName.incl";
     open PROC, "$tarCmd 2>&1|";
   }
   else {
