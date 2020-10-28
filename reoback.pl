@@ -1045,7 +1045,7 @@ sub logDie{
   if ($config{"uselog4perl"}) {
     $logger->logdie($message);
   } else {
-    logDie($message . "\n");
+    die($message . "\n");
   }
 }
 
@@ -1057,7 +1057,7 @@ sub logWarn{
   if ($config{"uselog4perl"}) {
     $logger->logwarn($message);
   } else {
-    logWarn($message);
+    warn($message);
   }
 }
 
